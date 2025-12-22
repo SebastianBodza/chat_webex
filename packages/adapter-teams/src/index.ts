@@ -85,14 +85,17 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   async handleWebhook(
     request: Request,
-    options?: WebhookOptions,
+    options?: WebhookOptions
   ): Promise<Response> {
     // Convert web Request to Node-style req/res for botbuilder
     const body = await request.text();
+    console.log("[teams] webhook body:", body);
+
     const headers: Record<string, string> = {};
     request.headers.forEach((value, key) => {
       headers[key] = value;
     });
+    console.log("[teams] webhook headers:", JSON.stringify(headers, null, 2));
 
     return new Promise((resolve) => {
       // Create mock req/res objects for botbuilder
@@ -126,7 +129,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
             new Response(responseBody, {
               status: responseStatus,
               headers: { "Content-Type": "application/json" },
-            }),
+            })
           );
         },
         end: () => {
@@ -139,26 +142,28 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       // Cast to satisfy botbuilder's Node.js-style req/res types
       // Our mock objects implement the minimal interface needed
       // biome-ignore lint/suspicious/noExplicitAny: botbuilder expects Node.js types incompatible with our mock
-      this.botAdapter.process(req as any, res as any, async (context) => {
-        await this.handleTurn(context, options);
-      }).catch((error) => {
-        this.logger?.error("Bot adapter process error", { error });
-        if (!resolved) {
-          resolved = true;
-          resolve(
-            new Response(JSON.stringify({ error: "Internal error" }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            }),
-          );
-        }
-      });
+      this.botAdapter
+        .process(req as any, res as any, async (context) => {
+          await this.handleTurn(context, options);
+        })
+        .catch((error) => {
+          this.logger?.error("Bot adapter process error", { error });
+          if (!resolved) {
+            resolved = true;
+            resolve(
+              new Response(JSON.stringify({ error: "Internal error" }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+              })
+            );
+          }
+        });
     });
   }
 
   private async handleTurn(
     context: TurnContext,
-    options?: WebhookOptions,
+    options?: WebhookOptions
   ): Promise<void> {
     if (!this.chat) {
       this.logger?.warn("Chat instance not initialized");
@@ -203,7 +208,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   private parseTeamsMessage(
     activity: Activity,
-    threadId: string,
+    threadId: string
   ): Message<unknown> {
     const text = activity.text || "";
     // Normalize mentions - format converter will convert <at>name</at> to @name
@@ -247,7 +252,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   async postMessage(
     threadId: string,
-    message: PostableMessage,
+    message: PostableMessage
   ): Promise<RawMessage<unknown>> {
     const { conversationId, serviceUrl } = this.decodeThreadId(threadId);
 
@@ -272,7 +277,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       async (context) => {
         const response = await context.sendActivity(activity);
         messageId = response?.id || "";
-      },
+      }
     );
 
     return {
@@ -285,7 +290,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   async editMessage(
     threadId: string,
     messageId: string,
-    message: PostableMessage,
+    message: PostableMessage
   ): Promise<RawMessage<unknown>> {
     const { conversationId, serviceUrl } = this.decodeThreadId(threadId);
 
@@ -307,7 +312,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       conversationReference as Partial<ConversationReference>,
       async (context) => {
         await context.updateActivity(activity);
-      },
+      }
     );
 
     return {
@@ -331,14 +336,14 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       conversationReference as Partial<ConversationReference>,
       async (context) => {
         await context.deleteActivity(messageId);
-      },
+      }
     );
   }
 
   async addReaction(
     _threadId: string,
     _messageId: string,
-    _emoji: string,
+    _emoji: string
   ): Promise<void> {
     // Teams reactions require different API approach
     this.logger?.warn("Reactions not yet implemented");
@@ -347,7 +352,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   async removeReaction(
     _threadId: string,
     _messageId: string,
-    _emoji: string,
+    _emoji: string
   ): Promise<void> {
     this.logger?.warn("Reactions not yet implemented");
   }
@@ -366,13 +371,13 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       conversationReference as Partial<ConversationReference>,
       async (context) => {
         await context.sendActivity({ type: ActivityTypes.Typing });
-      },
+      }
     );
   }
 
   async fetchMessages(
     _threadId: string,
-    _options: FetchOptions = {},
+    _options: FetchOptions = {}
   ): Promise<Message<unknown>[]> {
     // Teams doesn't have a direct API to fetch message history
     // This would require Graph API integration
@@ -393,10 +398,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   encodeThreadId(platformData: TeamsThreadId): string {
     // Base64 encode both since conversationId and serviceUrl can contain special characters
     const encodedConversationId = Buffer.from(
-      platformData.conversationId,
+      platformData.conversationId
     ).toString("base64url");
     const encodedServiceUrl = Buffer.from(platformData.serviceUrl).toString(
-      "base64url",
+      "base64url"
     );
     return `teams:${encodedConversationId}:${encodedServiceUrl}`;
   }
@@ -408,10 +413,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     }
     const conversationId = Buffer.from(
       parts[1] as string,
-      "base64url",
+      "base64url"
     ).toString("utf-8");
     const serviceUrl = Buffer.from(parts[2] as string, "base64url").toString(
-      "utf-8",
+      "utf-8"
     );
     return { conversationId, serviceUrl };
   }
