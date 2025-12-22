@@ -3,16 +3,11 @@ import {
   type GoogleChatAdapter,
 } from "@chat-sdk/gchat";
 import { createSlackAdapter, type SlackAdapter } from "@chat-sdk/slack";
-import { createMemoryState } from "@chat-sdk/state-memory";
+import { createRedisState } from "@chat-sdk/state-redis";
 import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
 import { Chat } from "chat-sdk";
 
-// import { createRedisState } from "@chat-sdk/state-redis";
-
-// For development, use memory state
-// For production, use Redis:
-// const state = createRedisState({ url: process.env.REDIS_URL! });
-const state = createMemoryState();
+const state = createRedisState({ url: process.env.REDIS_URL! });
 
 // Build type-safe adapters based on available environment variables
 function buildAdapters() {
@@ -74,7 +69,7 @@ bot.onNewMention(async (thread, _message) => {
   // Respond to the mention
   await thread.post(
     `Thanks for mentioning me! I'm now listening to this thread.\n\n` +
-      `_Connected via ${thread.adapter.name}_`,
+      `_Connected via ${thread.adapter.name}_`
   );
 });
 
@@ -85,7 +80,7 @@ bot.onSubscribed(async (thread, message) => {
 
   // Echo back with platform info
   const response = await thread.post(
-    `You said: "${message.text}"\n\n_via ${thread.adapter.name}_`,
+    `You said: "${message.text}"\n\n_via ${thread.adapter.name}_`
   );
 
   // Add a reaction to our own message (if supported)
@@ -104,6 +99,6 @@ bot.onNewMessage(/help/i, async (thread, message) => {
     `Hi ${message.author.userName}! Here's how I can help:\n\n` +
       `• **Mention me** to start a conversation\n` +
       `• I'll respond to messages in threads where I'm mentioned\n` +
-      `• Active platforms: ${platforms}`,
+      `• Active platforms: ${platforms}`
   );
 });
