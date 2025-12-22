@@ -36,7 +36,9 @@ function createVercelOIDCAuth() {
   const serviceAccountEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL;
 
   if (!projectNumber || !poolId || !providerId || !serviceAccountEmail) {
-    return null;
+    throw new Error(
+      "GCP_PROJECT_NUMBER, GCP_WORKLOAD_IDENTITY_POOL_ID, GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID, and GCP_SERVICE_ACCOUNT_EMAIL are required"
+    );
   }
 
   const client = new IdentityPoolClient({
@@ -56,12 +58,13 @@ export function buildAdapters(): Adapters {
   const adapters: Adapters = {};
 
   // Slack adapter
-  if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_SIGNING_SECRET) {
-    adapters.slack = createSlackAdapter({
-      botToken: process.env.SLACK_BOT_TOKEN,
-      signingSecret: process.env.SLACK_SIGNING_SECRET,
-    });
+  if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_SIGNING_SECRET) {
+    throw new Error("SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET are required");
   }
+  adapters.slack = createSlackAdapter({
+    botToken: process.env.SLACK_BOT_TOKEN,
+    signingSecret: process.env.SLACK_SIGNING_SECRET,
+  });
 
   // Teams adapter
   if (process.env.TEAMS_APP_ID && process.env.TEAMS_APP_PASSWORD) {
