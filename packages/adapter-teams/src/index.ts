@@ -3,6 +3,7 @@ import {
   ActivityTypes,
   CloudAdapter,
   ConfigurationBotFrameworkAuthentication,
+  ConfigurationServiceClientCredentialFactory,
   type TurnContext,
 } from "botbuilder";
 
@@ -67,10 +68,17 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     this.config = config;
     this.userName = config.userName || "bot";
 
-    const auth = new ConfigurationBotFrameworkAuthentication({
+    // Create credentials factory with app ID and password
+    const credentialsFactory = new ConfigurationServiceClientCredentialFactory({
       MicrosoftAppId: config.appId,
       MicrosoftAppPassword: config.appPassword,
     });
+
+    // Pass app ID in auth config, credentials via factory
+    const auth = new ConfigurationBotFrameworkAuthentication(
+      { MicrosoftAppId: config.appId },
+      credentialsFactory
+    );
 
     this.botAdapter = new ServerlessCloudAdapter(auth);
   }
