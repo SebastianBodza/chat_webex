@@ -96,14 +96,22 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
     return new Promise((resolve) => {
       // Create mock req/res objects for botbuilder
-      const req: BotRequest = {
-        body: JSON.parse(body),
-        headers,
-        method: request.method,
-      };
+      let req: BotRequest;
+      try {
+        req = {
+          body: JSON.parse(body),
+          headers,
+          method: request.method,
+        };
+      } catch (e) {
+        this.logger?.error("Failed to parse request body", { error: e });
+        resolve(new Response("Invalid JSON", { status: 400 }));
+        return;
+      }
 
       let responseBody = "";
       let responseStatus = 200;
+      let resolved = false;
 
       const res: BotResponse = {
         status: (code: number) => {
@@ -111,6 +119,8 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
           return res;
         },
         send: (data?: string) => {
+          if (resolved) return;
+          resolved = true;
           responseBody = data || "";
           resolve(
             new Response(responseBody, {
@@ -120,6 +130,8 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
           );
         },
         end: () => {
+          if (resolved) return;
+          resolved = true;
           resolve(new Response(responseBody, { status: responseStatus }));
         },
       };
@@ -129,6 +141,17 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       // biome-ignore lint/suspicious/noExplicitAny: botbuilder expects Node.js types incompatible with our mock
       this.botAdapter.process(req as any, res as any, async (context) => {
         await this.handleTurn(context, options);
+      }).catch((error) => {
+        this.logger?.error("Bot adapter process error", { error });
+        if (!resolved) {
+          resolved = true;
+          resolve(
+            new Response(JSON.stringify({ error: "Internal error" }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
       });
     });
   }
