@@ -80,6 +80,7 @@ export function buildAdapters(): Adapters {
   adapters.teams = createTeamsAdapter({
     appId: process.env.TEAMS_APP_ID,
     appPassword: process.env.TEAMS_APP_PASSWORD,
+    userName: "Chat SDK Demo",
   });
 
   // Google Chat adapter
