@@ -27,7 +27,7 @@ interface MessagePattern {
  */
 type WebhookHandler = (
   request: Request,
-  options?: WebhookOptions,
+  options?: WebhookOptions
 ) => Promise<Response>;
 
 /**
@@ -54,7 +54,7 @@ type Webhooks<TAdapters extends Record<string, Adapter>> = {
  * chat.webhooks.slack(request, { waitUntil });
  */
 export class Chat<
-  TAdapters extends Record<string, Adapter> = Record<string, Adapter>,
+  TAdapters extends Record<string, Adapter> = Record<string, Adapter>
 > implements ChatInstance
 {
   private adapters: Map<string, Adapter>;
@@ -113,7 +113,7 @@ export class Chat<
   private async handleWebhook(
     adapterName: string,
     request: Request,
-    options?: WebhookOptions,
+    options?: WebhookOptions
   ): Promise<Response> {
     // Ensure initialization
     await this.ensureInitialized();
@@ -148,9 +148,10 @@ export class Chat<
     await this.state.connect();
     this.logger.debug("State connected");
 
-    const initPromises = Array.from(this.adapters.values()).map((adapter) =>
-      adapter.initialize(this),
-    );
+    const initPromises = Array.from(this.adapters.values()).map((adapter) => {
+      this.logger.debug("Initializing adapter", { adapter: adapter.name });
+      return adapter.initialize(this);
+    });
     await Promise.all(initPromises);
 
     this.initialized = true;
@@ -223,7 +224,7 @@ export class Chat<
   async handleIncomingMessage(
     adapter: Adapter,
     threadId: string,
-    message: Message,
+    message: Message
   ): Promise<void> {
     this.logger.debug("Incoming message", {
       adapter: adapter.name,
@@ -243,7 +244,7 @@ export class Chat<
     if (!lock) {
       this.logger.warn("Could not acquire lock on thread", { threadId });
       throw new LockError(
-        `Could not acquire lock on thread ${threadId}. Another instance may be processing.`,
+        `Could not acquire lock on thread ${threadId}. Another instance may be processing.`
       );
     }
 
@@ -290,7 +291,7 @@ export class Chat<
   private async createThread(
     adapter: Adapter,
     threadId: string,
-    initialMessage: Message,
+    initialMessage: Message
   ): Promise<Thread> {
     // Parse thread ID to get channel info
     // Format: "adapter:channel:thread"
@@ -315,14 +316,20 @@ export class Chat<
     const botUserId = adapter.botUserId;
 
     // Primary check: @username format (normalized by all adapters)
-    const usernamePattern = new RegExp(`@${this.escapeRegex(botUserName)}\\b`, "i");
+    const usernamePattern = new RegExp(
+      `@${this.escapeRegex(botUserName)}\\b`,
+      "i"
+    );
     if (usernamePattern.test(message.text)) {
       return true;
     }
 
     // Fallback: check for user ID mention if available (e.g., @U_BOT_123)
     if (botUserId) {
-      const userIdPattern = new RegExp(`@${this.escapeRegex(botUserId)}\\b`, "i");
+      const userIdPattern = new RegExp(
+        `@${this.escapeRegex(botUserId)}\\b`,
+        "i"
+      );
       if (userIdPattern.test(message.text)) {
         return true;
       }
@@ -338,7 +345,7 @@ export class Chat<
   private async runHandlers(
     handlers: Array<(thread: Thread, message: Message) => Promise<void>>,
     thread: Thread,
-    message: Message,
+    message: Message
   ): Promise<void> {
     for (const handler of handlers) {
       await handler(thread, message);
