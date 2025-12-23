@@ -243,9 +243,13 @@ export class Chat<
       isMe: message.author.isMe,
     });
 
-    // Skip messages from self
+    // Skip messages from self (bot's own messages)
     if (message.author.isMe) {
-      this.logger.debug("Skipping self message");
+      this.logger.debug("Skipping message from self (isMe=true)", {
+        adapter: adapter.name,
+        threadId,
+        author: message.author.userName,
+      });
       return;
     }
 
@@ -284,13 +288,23 @@ export class Chat<
       }
 
       // Check message patterns
+      let matchedPattern = false;
       for (const { pattern, handler } of this.messagePatterns) {
         if (pattern.test(message.text)) {
           this.logger.debug("Message matched pattern", {
             pattern: pattern.toString(),
           });
+          matchedPattern = true;
           await handler(thread, message);
         }
+      }
+
+      // Log if no handlers matched
+      if (!matchedPattern) {
+        this.logger.debug("No handlers matched message", {
+          threadId,
+          text: message.text.slice(0, 100),
+        });
       }
     } finally {
       await this.state.releaseLock(lock);

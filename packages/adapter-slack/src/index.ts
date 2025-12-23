@@ -185,20 +185,21 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     options?: WebhookOptions,
   ): void {
     if (!this.chat) {
+      this.logger?.warn("Chat instance not initialized, ignoring event");
       return;
     }
 
-    // Skip bot messages
-    if (event.bot_id) {
-      return;
-    }
-
-    // Skip message subtypes we don't handle
-    if (event.subtype === "message_changed") {
+    // Skip message subtypes we don't handle (edits, deletes, etc.)
+    if (event.subtype && event.subtype !== "bot_message") {
+      this.logger?.debug("Ignoring message subtype", { subtype: event.subtype });
       return;
     }
 
     if (!event.channel || !event.ts) {
+      this.logger?.debug("Ignoring event without channel or ts", {
+        channel: event.channel,
+        ts: event.ts,
+      });
       return;
     }
 
@@ -230,7 +231,11 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     event: SlackEvent,
     threadId: string,
   ): Message<unknown> {
-    const isMe = this._botUserId ? event.user === this._botUserId : false;
+    // Check if this message is from our bot
+    // Bot messages have bot_id, user messages have user
+    const isMe = this._botUserId
+      ? event.user === this._botUserId || event.bot_id === this._botUserId
+      : false;
 
     const text = event.text || "";
 

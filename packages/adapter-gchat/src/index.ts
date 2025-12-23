@@ -235,20 +235,17 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     options?: WebhookOptions
   ): void {
     if (!this.chat) {
-      this.logger?.warn("Chat instance not initialized");
+      this.logger?.warn("Chat instance not initialized, ignoring event");
       return;
     }
 
     const messagePayload = event.chat?.messagePayload;
-    if (!messagePayload) return;
-
-    const message = messagePayload.message;
-
-    // Skip bot's own messages
-    if (message.sender?.type === "BOT") {
+    if (!messagePayload) {
+      this.logger?.debug("Ignoring event without messagePayload");
       return;
     }
 
+    const message = messagePayload.message;
     const threadName = message.thread?.name || message.name;
     const threadId = this.encodeThreadId({
       spaceName: messagePayload.space.name,
@@ -284,6 +281,10 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
     const text = message.text || "";
 
+    // In Google Chat, if sender.type is "BOT", it's always THIS bot
+    // (Google Chat only sends our bot's messages to our webhook)
+    const isBot = message.sender?.type === "BOT";
+
     return {
       id: message.name,
       threadId,
@@ -294,8 +295,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         userId: message.sender?.name || "unknown",
         userName: message.sender?.displayName || "unknown",
         fullName: message.sender?.displayName || "unknown",
-        isBot: message.sender?.type === "BOT",
-        isMe: false,
+        isBot,
+        isMe: isBot,
       },
       metadata: {
         dateSent: new Date(message.createTime),
@@ -424,6 +425,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
           spaceName,
           threadName: msg.thread?.name ?? undefined,
         });
+        const msgIsBot = msg.sender?.type === "BOT";
         return {
           id: msg.name || "",
           threadId: msgThreadId,
@@ -434,8 +436,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
             userId: msg.sender?.name || "unknown",
             userName: msg.sender?.displayName || "unknown",
             fullName: msg.sender?.displayName || "unknown",
-            isBot: msg.sender?.type === "BOT",
-            isMe: false,
+            isBot: msgIsBot,
+            isMe: msgIsBot,
           },
           metadata: {
             dateSent: msg.createTime ? new Date(msg.createTime) : new Date(),

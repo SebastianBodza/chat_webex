@@ -138,7 +138,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     options?: WebhookOptions
   ): Promise<void> {
     if (!this.chat) {
-      this.logger?.warn("Chat instance not initialized");
+      this.logger?.warn("Chat instance not initialized, ignoring event");
       return;
     }
 
@@ -146,11 +146,9 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
     // Only handle message activities
     if (activity.type !== ActivityTypes.Message) {
-      return;
-    }
-
-    // Skip bot's own messages
-    if (activity.from?.id === activity.recipient?.id) {
+      this.logger?.debug("Ignoring non-message activity", {
+        type: activity.type,
+      });
       return;
     }
 
@@ -186,6 +184,11 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     // Normalize mentions - format converter will convert <at>name</at> to @name
     const normalizedText = this.normalizeMentions(text, activity);
 
+    // Check if this message is from our bot
+    // In Teams, the bot's from.id contains the app ID
+    const fromId = activity.from?.id || "";
+    const isMe = fromId.includes(this.config.appId);
+
     return {
       id: activity.id || "",
       threadId,
@@ -193,11 +196,11 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       formatted: this.formatConverter.toAst(normalizedText),
       raw: activity,
       author: {
-        userId: activity.from?.id || "unknown",
+        userId: fromId || "unknown",
         userName: activity.from?.name || "unknown",
         fullName: activity.from?.name || "unknown",
         isBot: activity.from?.role === "bot",
-        isMe: false,
+        isMe,
       },
       metadata: {
         dateSent: activity.timestamp

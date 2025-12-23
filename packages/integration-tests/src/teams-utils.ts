@@ -7,7 +7,8 @@ import type { TeamsAdapter } from "@chat-sdk/teams";
 
 export const TEAMS_APP_ID = "test-app-id";
 export const TEAMS_APP_PASSWORD = "test-app-password";
-export const TEAMS_BOT_ID = "28:bot-id-123";
+// In Teams, bot from.id contains the app ID in format "28:appId"
+export const TEAMS_BOT_ID = `28:${TEAMS_APP_ID}`;
 export const TEAMS_BOT_NAME = "TestBot";
 
 /**

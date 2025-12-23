@@ -26,3 +26,5 @@ coverage/
 # Next.js
 .next/
 out/
+
+tsup.config.bundled*.mjs
