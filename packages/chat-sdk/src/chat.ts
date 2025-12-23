@@ -239,7 +239,10 @@ export class Chat<
     this.logger.debug("Incoming message", {
       adapter: adapter.name,
       threadId,
+      text: message.text,
       author: message.author.userName,
+      authorUserId: message.author.userId,
+      isBot: message.author.isBot,
       isMe: message.author.isMe,
     });
 
@@ -270,8 +273,16 @@ export class Chat<
 
       // Check if this is a subscribed thread first
       const isSubscribed = await this.state.isSubscribed(threadId);
+      this.logger.debug("Subscription check", {
+        threadId,
+        isSubscribed,
+        subscribedHandlerCount: this.subscribedMessageHandlers.length,
+      });
       if (isSubscribed) {
-        this.logger.debug("Message in subscribed thread", { threadId });
+        this.logger.debug("Message in subscribed thread - calling handlers", {
+          threadId,
+          handlerCount: this.subscribedMessageHandlers.length,
+        });
         await this.runHandlers(this.subscribedMessageHandlers, thread, message);
         return;
       }
@@ -288,10 +299,21 @@ export class Chat<
       }
 
       // Check message patterns
+      this.logger.debug("Checking message patterns", {
+        patternCount: this.messagePatterns.length,
+        patterns: this.messagePatterns.map((p) => p.pattern.toString()),
+        messageText: message.text,
+      });
       let matchedPattern = false;
       for (const { pattern, handler } of this.messagePatterns) {
-        if (pattern.test(message.text)) {
-          this.logger.debug("Message matched pattern", {
+        const matches = pattern.test(message.text);
+        this.logger.debug("Pattern test", {
+          pattern: pattern.toString(),
+          text: message.text,
+          matches,
+        });
+        if (matches) {
+          this.logger.debug("Message matched pattern - calling handler", {
             pattern: pattern.toString(),
           });
           matchedPattern = true;

@@ -97,6 +97,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     options?: WebhookOptions
   ): Promise<Response> {
     const body = await request.text();
+    this.logger?.debug("Teams webhook raw body", { body });
 
     let activity: Activity;
     try {
@@ -159,6 +160,16 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     });
 
     const message = this.parseTeamsMessage(activity, threadId);
+    this.logger?.debug("Teams parsed message", {
+      threadId,
+      messageId: message.id,
+      text: message.text,
+      authorUserId: message.author.userId,
+      authorUserName: message.author.userName,
+      isBot: message.author.isBot,
+      isMe: message.author.isMe,
+      rawActivity: activity,
+    });
 
     // Run message handling in background
     const handleTask = this.chat

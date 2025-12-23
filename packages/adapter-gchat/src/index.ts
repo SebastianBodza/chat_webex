@@ -197,9 +197,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     request: Request,
     options?: WebhookOptions
   ): Promise<Response> {
-    this.logger?.debug("webhook received");
-
     const body = await request.text();
+    this.logger?.debug("GChat webhook raw body", { body });
 
     let event: GoogleChatEvent;
     try {
@@ -253,6 +252,16 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     });
 
     const parsedMessage = this.parseGoogleChatMessage(event, threadId);
+    this.logger?.debug("GChat parsed message", {
+      threadId,
+      messageId: parsedMessage.id,
+      text: parsedMessage.text,
+      authorUserId: parsedMessage.author.userId,
+      authorUserName: parsedMessage.author.userName,
+      isBot: parsedMessage.author.isBot,
+      isMe: parsedMessage.author.isMe,
+      rawEvent: event,
+    });
 
     // Run message handling in background
     const handleTask = this.chat

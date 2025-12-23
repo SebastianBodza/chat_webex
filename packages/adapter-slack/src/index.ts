@@ -108,6 +108,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     options?: WebhookOptions,
   ): Promise<Response> {
     const body = await request.text();
+    this.logger?.debug("Slack webhook raw body", { body });
 
     // Verify request signature
     const timestamp = request.headers.get("x-slack-request-timestamp");
@@ -210,6 +211,16 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     });
 
     const message = this.parseSlackMessage(event, threadId);
+    this.logger?.debug("Slack parsed message", {
+      threadId,
+      messageId: message.id,
+      text: message.text,
+      authorUserId: message.author.userId,
+      authorUserName: message.author.userName,
+      isBot: message.author.isBot,
+      isMe: message.author.isMe,
+      rawEvent: event,
+    });
 
     // Run message handling in background
     const handleTask = this.chat
