@@ -23,17 +23,25 @@ bot.onNewMention(async (thread, _message) => {
   );
 });
 
+// Helper to delay execution
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Handle messages in subscribed threads
-bot.onSubscribed(async (thread, message) => {
+bot.onSubscribed(async (thread, _message) => {
+  // Start with typing indicator
   await thread.startTyping();
-  const response = await thread.post(
-    `You said: "${message.text}"\n\n_via ${thread.adapter.name}_`
-  );
-  try {
-    await response.addReaction("robot_face");
-  } catch {
-    // Reactions might not be supported on all platforms
-  }
+
+  // After 1 second, post "Processing..."
+  await delay(1000);
+  const response = await thread.post("Processing...");
+
+  // After 2 more seconds, edit to "Just a little bit..."
+  await delay(2000);
+  await response.edit("Just a little bit...");
+
+  // After 1 more second, edit to final message
+  await delay(1000);
+  await response.edit("Thanks for your message");
 });
 
 // Handle messages matching a pattern
