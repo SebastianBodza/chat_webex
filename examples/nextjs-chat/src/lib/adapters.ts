@@ -90,6 +90,8 @@ export function buildAdapters(): Adapters {
     adapters.gchat = createGoogleChatAdapter({
       auth: vercelAuth,
       userName: "Chat SDK Demo",
+      appType: "SingleTenant",
+      appTenantId: process.env.TEAMS_APP_TENANT_ID as string,
     });
   }
   // Option 2: Service account credentials (JSON key)

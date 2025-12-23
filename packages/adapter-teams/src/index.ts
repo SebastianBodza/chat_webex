@@ -41,6 +41,10 @@ export interface TeamsAdapterConfig {
   appId: string;
   /** Microsoft App Password */
   appPassword: string;
+  /** Microsoft App Type */
+  appType?: "MultiTenant" | "SingleTenant";
+  /** Microsoft App Tenant ID */
+  appTenantId?: string;
   /** Override bot username (optional) */
   userName?: string;
 }
@@ -67,11 +71,17 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     this.config = config;
     this.userName = config.userName || "bot";
 
+    if (config.appType === "SingleTenant" && !config.appTenantId) {
+      throw new Error("appTenantId is required for SingleTenant app type");
+    }
+
     // Pass empty config object, credentials go via factory
     const auth = new ConfigurationBotFrameworkAuthentication({
       MicrosoftAppId: config.appId,
       MicrosoftAppPassword: config.appPassword,
-      MicrosoftAppType: "MultiTenant",
+      MicrosoftAppType: config.appType || "MultiTenant",
+      MicrosoftAppTenantId:
+        config.appType === "SingleTenant" ? config.appTenantId : undefined,
     });
 
     this.botAdapter = new ServerlessCloudAdapter(auth);
