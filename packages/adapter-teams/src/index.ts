@@ -1,4 +1,4 @@
-import type { Activity, ConversationReference, Entity } from "botbuilder";
+import type { Activity, ConversationReference } from "botbuilder";
 import {
   ActivityTypes,
   CloudAdapter,
@@ -6,17 +6,12 @@ import {
   type TurnContext,
 } from "botbuilder";
 
-/** Entity with text property for @mentions */
-interface MentionEntity extends Entity {
-  text?: string;
-}
-
 /** Extended CloudAdapter that exposes processActivity for serverless environments */
 class ServerlessCloudAdapter extends CloudAdapter {
   handleActivity(
     authHeader: string,
     activity: Activity,
-    logic: (context: TurnContext) => Promise<void>
+    logic: (context: TurnContext) => Promise<void>,
   ) {
     return this.processActivity(authHeader, activity, logic);
   }
@@ -94,7 +89,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   async handleWebhook(
     request: Request,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): Promise<Response> {
     const body = await request.text();
     this.logger?.debug("Teams webhook raw body", { body });
@@ -118,7 +113,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
         activity,
         async (context) => {
           await this.handleTurn(context, options);
-        }
+        },
       );
 
       return new Response(JSON.stringify({}), {
@@ -136,7 +131,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   private async handleTurn(
     context: TurnContext,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): Promise<void> {
     if (!this.chat) {
       this.logger?.warn("Chat instance not initialized, ignoring event");
@@ -189,7 +184,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   private parseTeamsMessage(
     activity: Activity,
-    threadId: string
+    threadId: string,
   ): Message<unknown> {
     const text = activity.text || "";
     // Normalize mentions - format converter will convert <at>name</at> to @name
@@ -230,7 +225,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     };
   }
 
-  private normalizeMentions(text: string, activity: Activity): string {
+  private normalizeMentions(text: string, _activity: Activity): string {
     // Don't strip mentions - the format converter will convert <at>name</at> to @name
     // Just trim any leading/trailing whitespace that might result from mention placement
     return text.trim();
@@ -238,7 +233,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
   async postMessage(
     threadId: string,
-    message: PostableMessage
+    message: PostableMessage,
   ): Promise<RawMessage<unknown>> {
     const { conversationId, serviceUrl } = this.decodeThreadId(threadId);
 
@@ -263,7 +258,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       async (context) => {
         const response = await context.sendActivity(activity);
         messageId = response?.id || "";
-      }
+      },
     );
 
     return {
@@ -276,7 +271,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   async editMessage(
     threadId: string,
     messageId: string,
-    message: PostableMessage
+    message: PostableMessage,
   ): Promise<RawMessage<unknown>> {
     const { conversationId, serviceUrl } = this.decodeThreadId(threadId);
 
@@ -298,7 +293,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       conversationReference as Partial<ConversationReference>,
       async (context) => {
         await context.updateActivity(activity);
-      }
+      },
     );
 
     return {
@@ -322,14 +317,14 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       conversationReference as Partial<ConversationReference>,
       async (context) => {
         await context.deleteActivity(messageId);
-      }
+      },
     );
   }
 
   async addReaction(
     _threadId: string,
     _messageId: string,
-    _emoji: string
+    _emoji: string,
   ): Promise<void> {
     // Teams reactions require different API approach
     this.logger?.warn("Reactions not yet implemented");
@@ -338,7 +333,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   async removeReaction(
     _threadId: string,
     _messageId: string,
-    _emoji: string
+    _emoji: string,
   ): Promise<void> {
     this.logger?.warn("Reactions not yet implemented");
   }
@@ -357,13 +352,13 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       conversationReference as Partial<ConversationReference>,
       async (context) => {
         await context.sendActivity({ type: ActivityTypes.Typing });
-      }
+      },
     );
   }
 
   async fetchMessages(
     _threadId: string,
-    _options: FetchOptions = {}
+    _options: FetchOptions = {},
   ): Promise<Message<unknown>[]> {
     // Teams doesn't have a direct API to fetch message history
     // This would require Graph API integration
@@ -384,10 +379,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   encodeThreadId(platformData: TeamsThreadId): string {
     // Base64 encode both since conversationId and serviceUrl can contain special characters
     const encodedConversationId = Buffer.from(
-      platformData.conversationId
+      platformData.conversationId,
     ).toString("base64url");
     const encodedServiceUrl = Buffer.from(platformData.serviceUrl).toString(
-      "base64url"
+      "base64url",
     );
     return `teams:${encodedConversationId}:${encodedServiceUrl}`;
   }
@@ -399,10 +394,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     }
     const conversationId = Buffer.from(
       parts[1] as string,
-      "base64url"
+      "base64url",
     ).toString("utf-8");
     const serviceUrl = Buffer.from(parts[2] as string, "base64url").toString(
-      "utf-8"
+      "utf-8",
     );
     return { conversationId, serviceUrl };
   }
@@ -425,7 +420,4 @@ export function createTeamsAdapter(config: TeamsAdapterConfig): TeamsAdapter {
   return new TeamsAdapter(config);
 }
 
-export {
-  TeamsFormatConverter,
-  TeamsFormatConverter as TeamsMarkdownConverter,
-} from "./markdown";
+export { TeamsFormatConverter } from "./markdown";

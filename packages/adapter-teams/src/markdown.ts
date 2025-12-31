@@ -20,8 +20,8 @@ import {
   type InlineCode,
   type Link,
   type Paragraph,
-  parseMarkdown,
   type PostableMessage,
+  parseMarkdown,
   type Root,
   type Strong,
   type Text,
@@ -211,6 +211,3 @@ export class TeamsFormatConverter extends BaseFormatConverter {
     }
   }
 }
-
-// Backwards compatibility alias
-export { TeamsFormatConverter as TeamsMarkdownConverter };

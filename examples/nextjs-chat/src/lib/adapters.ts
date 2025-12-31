@@ -4,11 +4,11 @@ import {
 } from "@chat-sdk/gchat";
 import { createSlackAdapter, type SlackAdapter } from "@chat-sdk/slack";
 import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
+import { getVercelOidcToken } from "@vercel/functions/oidc";
 import {
   IdentityPoolClient,
   type SubjectTokenSupplier,
 } from "google-auth-library";
-import { getVercelOidcToken } from "@vercel/functions/oidc";
 
 export type Adapters = {
   slack?: SlackAdapter;
@@ -37,14 +37,14 @@ function createVercelOIDCAuth() {
 
   if (!projectNumber || !poolId || !providerId || !serviceAccountEmail) {
     throw new Error(
-      "GCP_PROJECT_NUMBER, GCP_WORKLOAD_IDENTITY_POOL_ID, GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID, and GCP_SERVICE_ACCOUNT_EMAIL are required"
+      "GCP_PROJECT_NUMBER, GCP_WORKLOAD_IDENTITY_POOL_ID, GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID, and GCP_SERVICE_ACCOUNT_EMAIL are required",
     );
   }
 
   const audience = `//iam.googleapis.com/projects/${projectNumber}/locations/global/workloadIdentityPools/${poolId}/providers/${providerId}`;
   console.log(
     "[gchat] Using Workload Identity Federation with audience:",
-    audience
+    audience,
   );
   const client = new IdentityPoolClient({
     audience,

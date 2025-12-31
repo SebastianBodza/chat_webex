@@ -142,18 +142,25 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
         user?.real_name ||
         user?.name ||
         userId;
-      const realName = user?.real_name || user?.profile?.real_name || displayName;
+      const realName =
+        user?.real_name || user?.profile?.real_name || displayName;
 
       // Cache the result via state adapter
       if (this.chat) {
-        await this.chat.getState().set<CachedUser>(
-          cacheKey,
-          { displayName, realName },
-          SlackAdapter.USER_CACHE_TTL_MS,
-        );
+        await this.chat
+          .getState()
+          .set<CachedUser>(
+            cacheKey,
+            { displayName, realName },
+            SlackAdapter.USER_CACHE_TTL_MS,
+          );
       }
 
-      this.logger?.debug("Fetched user info", { userId, displayName, realName });
+      this.logger?.debug("Fetched user info", {
+        userId,
+        displayName,
+        realName,
+      });
       return { displayName, realName };
     } catch (error) {
       this.logger?.warn("Could not fetch user info", { userId, error });
@@ -251,7 +258,9 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
 
     // Skip message subtypes we don't handle (edits, deletes, etc.)
     if (event.subtype && event.subtype !== "bot_message") {
-      this.logger?.debug("Ignoring message subtype", { subtype: event.subtype });
+      this.logger?.debug("Ignoring message subtype", {
+        subtype: event.subtype,
+      });
       return;
     }
 
@@ -283,7 +292,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
         rawEvent: event,
       });
 
-      await this.chat!.handleIncomingMessage(this, threadId, message);
+      await this.chat?.handleIncomingMessage(this, threadId, message);
     })().catch((err) => {
       this.logger?.error("Message handling error", { error: err });
     });

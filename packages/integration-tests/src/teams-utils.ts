@@ -2,8 +2,8 @@
  * Teams test utilities for creating mock adapters, activities, and webhook requests.
  */
 
-import { vi } from "vitest";
 import type { TeamsAdapter } from "@chat-sdk/teams";
+import { vi } from "vitest";
 
 export const TEAMS_APP_ID = "test-app-id";
 export const TEAMS_APP_PASSWORD = "test-app-password";
@@ -184,8 +184,12 @@ export function injectMockBotAdapter(
 /**
  * Get expected Teams thread ID format
  */
-export function getTeamsThreadId(conversationId: string, serviceUrl: string): string {
-  const encodedConversationId = Buffer.from(conversationId).toString("base64url");
+export function getTeamsThreadId(
+  conversationId: string,
+  serviceUrl: string,
+): string {
+  const encodedConversationId =
+    Buffer.from(conversationId).toString("base64url");
   const encodedServiceUrl = Buffer.from(serviceUrl).toString("base64url");
   return `teams:${encodedConversationId}:${encodedServiceUrl}`;
 }
@@ -193,4 +197,5 @@ export function getTeamsThreadId(conversationId: string, serviceUrl: string): st
 /**
  * Default Teams service URL for testing
  */
-export const DEFAULT_TEAMS_SERVICE_URL = "https://smba.trafficmanager.net/teams/";
+export const DEFAULT_TEAMS_SERVICE_URL =
+  "https://smba.trafficmanager.net/teams/";

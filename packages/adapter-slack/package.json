@@ -12,7 +12,9 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -32,6 +34,11 @@
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   },
-  "keywords": ["chat-sdk", "slack", "bot", "adapter"],
+  "keywords": [
+    "chat-sdk",
+    "slack",
+    "bot",
+    "adapter"
+  ],
   "license": "MIT"
 }

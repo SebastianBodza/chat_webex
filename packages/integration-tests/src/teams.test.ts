@@ -1,21 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Chat } from "chat-sdk";
-import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
 import { createMemoryState } from "@chat-sdk/state-memory";
-import { createWaitUntilTracker } from "./test-scenarios";
+import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
+import { Chat } from "chat-sdk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createMockBotAdapter,
+  createTeamsActivity,
+  createTeamsWebhookRequest,
+  DEFAULT_TEAMS_SERVICE_URL,
+  getTeamsThreadId,
+  injectMockBotAdapter,
+  type MockBotAdapter,
   TEAMS_APP_ID,
   TEAMS_APP_PASSWORD,
   TEAMS_BOT_ID,
   TEAMS_BOT_NAME,
-  DEFAULT_TEAMS_SERVICE_URL,
-  createTeamsActivity,
-  createTeamsWebhookRequest,
-  createMockBotAdapter,
-  injectMockBotAdapter,
-  getTeamsThreadId,
-  type MockBotAdapter,
 } from "./teams-utils";
+import { createWaitUntilTracker } from "./test-scenarios";
 
 describe("Teams Integration", () => {
   let chat: Chat<{ teams: TeamsAdapter }>;
@@ -25,7 +25,10 @@ describe("Teams Integration", () => {
   let tracker: ReturnType<typeof createWaitUntilTracker>;
 
   const TEST_CONVERSATION_ID = "19:meeting_123@thread.v2";
-  const TEST_THREAD_ID = getTeamsThreadId(TEST_CONVERSATION_ID, DEFAULT_TEAMS_SERVICE_URL);
+  const TEST_THREAD_ID = getTeamsThreadId(
+    TEST_CONVERSATION_ID,
+    DEFAULT_TEAMS_SERVICE_URL,
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,7 +71,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       const request = createTeamsWebhookRequest(activity);
@@ -80,7 +89,10 @@ describe("Teams Integration", () => {
       await tracker.waitForAll();
 
       // Mentions are normalized to @name format
-      expect(handlerMock).toHaveBeenCalledWith(TEST_THREAD_ID, `@${TEAMS_BOT_NAME} hello bot!`);
+      expect(handlerMock).toHaveBeenCalledWith(
+        TEST_THREAD_ID,
+        `@${TEAMS_BOT_NAME} hello bot!`,
+      );
 
       expect(mockBotAdapter.sentActivities.length).toBeGreaterThan(0);
       const sentActivity = mockBotAdapter.sentActivities[0] as { text: string };
@@ -106,7 +118,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(mentionActivity), {
@@ -233,7 +251,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(activity), {
@@ -260,7 +284,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(activity), {
@@ -292,7 +322,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(activity), {
@@ -318,7 +354,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(activity), {
@@ -340,7 +382,9 @@ describe("Teams Integration", () => {
       chat.onNewMention(async (thread, message) => {
         conversationLog.push(`mention: ${message.text}`);
         await thread.subscribe();
-        await thread.post("Hi! I'm now listening to this thread. How can I help?");
+        await thread.post(
+          "Hi! I'm now listening to this thread. How can I help?",
+        );
       });
 
       chat.onSubscribedMessage(async (thread, message) => {
@@ -348,10 +392,14 @@ describe("Teams Integration", () => {
         messageCount++;
 
         if (message.text.includes("weather")) {
-          const response = await thread.post("Let me check the weather for you...");
+          const response = await thread.post(
+            "Let me check the weather for you...",
+          );
           await response.edit("The weather today is sunny, 72°F!");
         } else if (message.text.includes("thanks")) {
-          await thread.post("You're welcome! Let me know if you need anything else.");
+          await thread.post(
+            "You're welcome! Let me know if you need anything else.",
+          );
         } else {
           await thread.post(`Got it! You said: "${message.text}"`);
         }
@@ -364,7 +412,13 @@ describe("Teams Integration", () => {
         conversationId: TEST_CONVERSATION_ID,
         fromId: "user-123",
         fromName: "John Doe",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(mentionActivity), {
@@ -397,7 +451,9 @@ describe("Teams Integration", () => {
 
       expect(conversationLog).toContain("subscribed: What's the weather like?");
       expect(mockBotAdapter.sentActivities).toContainEqual(
-        expect.objectContaining({ text: "Let me check the weather for you..." }),
+        expect.objectContaining({
+          text: "Let me check the weather for you...",
+        }),
       );
       expect(mockBotAdapter.updatedActivities).toContainEqual(
         expect.objectContaining({ text: "The weather today is sunny, 72°F!" }),
@@ -477,8 +533,14 @@ describe("Teams Integration", () => {
 
       const thread1ConversationId = "19:thread1@thread.v2";
       const thread2ConversationId = "19:thread2@thread.v2";
-      const thread1Id = getTeamsThreadId(thread1ConversationId, DEFAULT_TEAMS_SERVICE_URL);
-      const thread2Id = getTeamsThreadId(thread2ConversationId, DEFAULT_TEAMS_SERVICE_URL);
+      const thread1Id = getTeamsThreadId(
+        thread1ConversationId,
+        DEFAULT_TEAMS_SERVICE_URL,
+      );
+      const thread2Id = getTeamsThreadId(
+        thread2ConversationId,
+        DEFAULT_TEAMS_SERVICE_URL,
+      );
 
       // Start thread 1
       const thread1Mention = createTeamsActivity({
@@ -487,7 +549,13 @@ describe("Teams Integration", () => {
         conversationId: thread1ConversationId,
         fromId: "user-A",
         fromName: "User A",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(thread1Mention), {
@@ -502,7 +570,13 @@ describe("Teams Integration", () => {
         conversationId: thread2ConversationId,
         fromId: "user-B",
         fromName: "User B",
-        mentions: [{ id: TEAMS_BOT_ID, name: TEAMS_BOT_NAME, text: `<at>${TEAMS_BOT_NAME}</at>` }],
+        mentions: [
+          {
+            id: TEAMS_BOT_ID,
+            name: TEAMS_BOT_NAME,
+            text: `<at>${TEAMS_BOT_NAME}</at>`,
+          },
+        ],
       });
 
       await chat.webhooks.teams(createTeamsWebhookRequest(thread2Mention), {

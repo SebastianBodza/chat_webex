@@ -154,6 +154,3 @@ export class GoogleChatFormatConverter extends BaseFormatConverter {
     }
   }
 }
-
-// Backwards compatibility alias
-export { GoogleChatFormatConverter as GoogleChatMarkdownConverter };

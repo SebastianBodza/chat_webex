@@ -207,7 +207,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       auth = config.auth;
     } else {
       throw new Error(
-        "GoogleChatAdapter requires one of: credentials, useApplicationDefaultCredentials, or auth"
+        "GoogleChatAdapter requires one of: credentials, useApplicationDefaultCredentials, or auth",
       );
     }
 
@@ -221,7 +221,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   async handleWebhook(
     request: Request,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): Promise<Response> {
     const body = await request.text();
     this.logger?.debug("GChat webhook raw body", { body });
@@ -288,7 +288,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    */
   private handlePubSubMessage(
     pushMessage: PubSubPushMessage,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): Response {
     try {
       const notification = decodePubSubMessage(pushMessage);
@@ -324,7 +324,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    */
   private handlePubSubMessageEvent(
     notification: WorkspaceEventNotification,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): void {
     if (!this.chat || !notification.message) {
       return;
@@ -334,7 +334,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     // Extract space name from targetResource: "//chat.googleapis.com/spaces/AAAA"
     const spaceName = notification.targetResource?.replace(
       "//chat.googleapis.com/",
-      ""
+      "",
     );
     const threadName = message.thread?.name || message.name;
     const threadId = this.encodeThreadId({
@@ -397,11 +397,11 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    */
   private handleAddedToSpace(
     space: GoogleChatSpace,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): void {
     if (!this.pubsubTopic) {
       this.logger?.debug(
-        "No pubsubTopic configured, skipping subscription creation"
+        "No pubsubTopic configured, skipping subscription creation",
       );
       return;
     }
@@ -414,7 +414,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
     if (!authOptions) {
       this.logger?.warn(
-        "Cannot create subscription: no credentials available (custom auth not supported)"
+        "Cannot create subscription: no credentials available (custom auth not supported)",
       );
       return;
     }
@@ -426,12 +426,15 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
           pubsubTopic: this.pubsubTopic,
         });
 
+        const pubsubTopic = this.pubsubTopic;
+        if (!pubsubTopic) return; // Already checked above, but satisfies type checker
+
         const result = await createSpaceSubscription(
           {
             spaceName: space.name,
-            pubsubTopic: this.pubsubTopic!,
+            pubsubTopic,
           },
-          authOptions
+          authOptions,
         );
 
         this.logger?.info("Workspace Events subscription created", {
@@ -454,7 +457,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   private handleMessageEvent(
     event: GoogleChatEvent,
-    options?: WebhookOptions
+    options?: WebhookOptions,
   ): void {
     if (!this.chat) {
       this.logger?.warn("Chat instance not initialized, ignoring event");
@@ -504,7 +507,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   private parseGoogleChatMessage(
     event: GoogleChatEvent,
-    threadId: string
+    threadId: string,
   ): Message<unknown> {
     const message = event.chat?.messagePayload?.message;
     if (!message) {
@@ -547,7 +550,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   async postMessage(
     threadId: string,
-    message: PostableMessage
+    message: PostableMessage,
   ): Promise<RawMessage<unknown>> {
     const { spaceName, threadName } = this.decodeThreadId(threadId);
 
@@ -577,7 +580,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   async editMessage(
     threadId: string,
     messageId: string,
-    message: PostableMessage
+    message: PostableMessage,
   ): Promise<RawMessage<unknown>> {
     try {
       const response = await this.chatApi.spaces.messages.update({
@@ -611,7 +614,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   async addReaction(
     _threadId: string,
     messageId: string,
-    emoji: string
+    emoji: string,
   ): Promise<void> {
     try {
       await this.chatApi.spaces.messages.reactions.create({
@@ -628,7 +631,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   async removeReaction(
     _threadId: string,
     _messageId: string,
-    _emoji: string
+    _emoji: string,
   ): Promise<void> {
     // Google Chat requires the reaction name to delete it
     this.logger?.warn("removeReaction requires reaction name, not implemented");
@@ -640,7 +643,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   async fetchMessages(
     threadId: string,
-    options: FetchOptions = {}
+    options: FetchOptions = {},
   ): Promise<Message<unknown>[]> {
     const { spaceName } = this.decodeThreadId(threadId);
 
@@ -749,7 +752,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       throw new RateLimitError(
         "Google Chat rate limit exceeded",
         undefined,
-        error
+        error,
       );
     }
 
@@ -758,25 +761,22 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 }
 
 export function createGoogleChatAdapter(
-  config: GoogleChatAdapterConfig
+  config: GoogleChatAdapterConfig,
 ): GoogleChatAdapter {
   return new GoogleChatAdapter(config);
 }
 
-export {
-  GoogleChatFormatConverter,
-  GoogleChatFormatConverter as GoogleChatMarkdownConverter,
-} from "./markdown";
+export { GoogleChatFormatConverter } from "./markdown";
 
 export {
-  createSpaceSubscription,
-  listSpaceSubscriptions,
-  deleteSpaceSubscription,
-  decodePubSubMessage,
-  verifyPubSubRequest,
   type CreateSpaceSubscriptionOptions,
-  type SpaceSubscriptionResult,
+  createSpaceSubscription,
+  decodePubSubMessage,
+  deleteSpaceSubscription,
+  listSpaceSubscriptions,
   type PubSubPushMessage,
+  type SpaceSubscriptionResult,
+  verifyPubSubRequest,
   type WorkspaceEventNotification,
   type WorkspaceEventsAuthOptions,
 } from "./workspace-events";

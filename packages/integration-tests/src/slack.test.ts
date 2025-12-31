@@ -1,21 +1,21 @@
 import { createHmac } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Chat } from "chat-sdk";
 import { createSlackAdapter, type SlackAdapter } from "@chat-sdk/slack";
 import { createMemoryState } from "@chat-sdk/state-memory";
-import { createWaitUntilTracker } from "./test-scenarios";
+import { Chat } from "chat-sdk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  SLACK_SIGNING_SECRET,
+  createMockSlackClient,
+  createSlackEvent,
+  createSlackWebhookRequest,
+  getSlackThreadId,
+  injectMockSlackClient,
+  type MockSlackClient,
   SLACK_BOT_TOKEN,
   SLACK_BOT_USER_ID,
   SLACK_BOT_USERNAME,
-  createSlackEvent,
-  createSlackWebhookRequest,
-  createMockSlackClient,
-  injectMockSlackClient,
-  getSlackThreadId,
-  type MockSlackClient,
+  SLACK_SIGNING_SECRET,
 } from "./slack-utils";
+import { createWaitUntilTracker } from "./test-scenarios";
 
 describe("Slack Integration", () => {
   let chat: Chat<{ slack: SlackAdapter }>;
@@ -448,7 +448,9 @@ describe("Slack Integration", () => {
       chat.onNewMention(async (thread, message) => {
         conversationLog.push(`mention: ${message.text}`);
         await thread.subscribe();
-        await thread.post("Hi! I'm now listening to this thread. How can I help?");
+        await thread.post(
+          "Hi! I'm now listening to this thread. How can I help?",
+        );
       });
 
       chat.onSubscribedMessage(async (thread, message) => {
@@ -456,7 +458,9 @@ describe("Slack Integration", () => {
         messageCount++;
 
         if (message.text.includes("weather")) {
-          const response = await thread.post("Let me check the weather for you...");
+          const response = await thread.post(
+            "Let me check the weather for you...",
+          );
           await response.edit("The weather today is sunny, 72°F!");
         } else if (message.text.includes("thanks")) {
           const response = await thread.post(
@@ -483,7 +487,9 @@ describe("Slack Integration", () => {
       });
       await tracker.waitForAll();
 
-      expect(conversationLog).toContain(`mention: @${SLACK_BOT_USER_ID} hey bot!`);
+      expect(conversationLog).toContain(
+        `mention: @${SLACK_BOT_USER_ID} hey bot!`,
+      );
       expect(mockClient.chat.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           text: "Hi! I'm now listening to this thread. How can I help?",
@@ -509,7 +515,9 @@ describe("Slack Integration", () => {
 
       expect(conversationLog).toContain("subscribed: What's the weather like?");
       expect(mockClient.chat.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ text: "Let me check the weather for you..." }),
+        expect.objectContaining({
+          text: "Let me check the weather for you...",
+        }),
       );
       expect(mockClient.chat.update).toHaveBeenCalledWith(
         expect.objectContaining({ text: "The weather today is sunny, 72°F!" }),

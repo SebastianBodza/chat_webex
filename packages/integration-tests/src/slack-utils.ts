@@ -3,8 +3,8 @@
  */
 
 import { createHmac } from "node:crypto";
-import { vi } from "vitest";
 import type { SlackAdapter } from "@chat-sdk/slack";
+import { vi } from "vitest";
 
 export const SLACK_SIGNING_SECRET = "test-signing-secret";
 export const SLACK_BOT_TOKEN = "xoxb-test-token";
@@ -82,7 +82,8 @@ export function createSlackWebhookRequest(
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const sigBasestring = `v0:${timestamp}:${body}`;
   const signature =
-    "v0=" + createHmac("sha256", signingSecret).update(sigBasestring).digest("hex");
+    "v0=" +
+    createHmac("sha256", signingSecret).update(sigBasestring).digest("hex");
 
   return new Request("https://example.com/webhook/slack", {
     method: "POST",

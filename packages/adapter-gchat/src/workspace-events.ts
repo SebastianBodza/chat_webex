@@ -99,7 +99,7 @@ export type WorkspaceEventsAuthOptions =
  */
 export async function createSpaceSubscription(
   options: CreateSpaceSubscriptionOptions,
-  auth: WorkspaceEventsAuthOptions
+  auth: WorkspaceEventsAuthOptions,
 ): Promise<SpaceSubscriptionResult> {
   const { spaceName, pubsubTopic, ttlSeconds = 86400 } = options; // Default 1 day
 
@@ -175,7 +175,7 @@ export async function createSpaceSubscription(
  */
 export async function listSpaceSubscriptions(
   spaceName: string,
-  auth: WorkspaceEventsAuthOptions
+  auth: WorkspaceEventsAuthOptions,
 ): Promise<Array<{ name: string; expireTime: string; eventTypes: string[] }>> {
   let authClient: Parameters<typeof google.workspaceevents>[0]["auth"];
 
@@ -212,7 +212,7 @@ export async function listSpaceSubscriptions(
  */
 export async function deleteSpaceSubscription(
   subscriptionName: string,
-  auth: WorkspaceEventsAuthOptions
+  auth: WorkspaceEventsAuthOptions,
 ): Promise<void> {
   let authClient: Parameters<typeof google.workspaceevents>[0]["auth"];
 
@@ -254,10 +254,10 @@ export async function deleteSpaceSubscription(
  * ```
  */
 export function decodePubSubMessage(
-  pushMessage: PubSubPushMessage
+  pushMessage: PubSubPushMessage,
 ): WorkspaceEventNotification {
   const data = Buffer.from(pushMessage.message.data, "base64").toString(
-    "utf-8"
+    "utf-8",
   );
   return JSON.parse(data) as WorkspaceEventNotification;
 }
@@ -270,7 +270,7 @@ export function decodePubSubMessage(
  */
 export function verifyPubSubRequest(
   request: Request,
-  _expectedAudience?: string
+  _expectedAudience?: string,
 ): boolean {
   // Basic check - Pub/Sub always sends POST with specific content type
   if (request.method !== "POST") {

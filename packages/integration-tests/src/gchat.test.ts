@@ -1,18 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Chat } from "chat-sdk";
-import { createGoogleChatAdapter, type GoogleChatAdapter } from "@chat-sdk/gchat";
-import { createMemoryState } from "@chat-sdk/state-memory";
-import { createWaitUntilTracker } from "./test-scenarios";
 import {
-  GCHAT_TEST_CREDENTIALS,
-  GCHAT_BOT_NAME,
+  createGoogleChatAdapter,
+  type GoogleChatAdapter,
+} from "@chat-sdk/gchat";
+import { createMemoryState } from "@chat-sdk/state-memory";
+import { Chat } from "chat-sdk";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
   createGoogleChatEvent,
   createGoogleChatWebhookRequest,
   createMockGoogleChatApi,
-  injectMockGoogleChatApi,
+  GCHAT_BOT_NAME,
+  GCHAT_TEST_CREDENTIALS,
   getGoogleChatThreadId,
+  injectMockGoogleChatApi,
   type MockGoogleChatApi,
 } from "./gchat-utils";
+import { createWaitUntilTracker } from "./test-scenarios";
 
 describe("Google Chat Integration", () => {
   let chat: Chat<{ gchat: GoogleChatAdapter }>;
@@ -23,7 +26,10 @@ describe("Google Chat Integration", () => {
 
   const TEST_SPACE_NAME = "spaces/AAAA_BBBB";
   const TEST_THREAD_NAME = "spaces/AAAA_BBBB/threads/CCCC_DDDD";
-  const TEST_THREAD_ID = getGoogleChatThreadId(TEST_SPACE_NAME, TEST_THREAD_NAME);
+  const TEST_THREAD_ID = getGoogleChatThreadId(
+    TEST_SPACE_NAME,
+    TEST_THREAD_NAME,
+  );
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -395,7 +401,9 @@ describe("Google Chat Integration", () => {
       chat.onNewMention(async (thread, message) => {
         conversationLog.push(`mention: ${message.text}`);
         await thread.subscribe();
-        await thread.post("Hi! I'm now listening to this thread. How can I help?");
+        await thread.post(
+          "Hi! I'm now listening to this thread. How can I help?",
+        );
       });
 
       chat.onSubscribedMessage(async (thread, message) => {
@@ -403,7 +411,9 @@ describe("Google Chat Integration", () => {
         messageCount++;
 
         if (message.text.includes("weather")) {
-          const response = await thread.post("Let me check the weather for you...");
+          const response = await thread.post(
+            "Let me check the weather for you...",
+          );
           await response.edit("The weather today is sunny, 72°F!");
         } else if (message.text.includes("thanks")) {
           const response = await thread.post(
@@ -457,7 +467,9 @@ describe("Google Chat Integration", () => {
 
       expect(conversationLog).toContain("subscribed: What's the weather like?");
       expect(mockChatApi.sentMessages).toContainEqual(
-        expect.objectContaining({ text: "Let me check the weather for you..." }),
+        expect.objectContaining({
+          text: "Let me check the weather for you...",
+        }),
       );
       expect(mockChatApi.updatedMessages).toContainEqual(
         expect.objectContaining({ text: "The weather today is sunny, 72°F!" }),
@@ -551,9 +563,12 @@ describe("Google Chat Integration", () => {
         hasBotMention: true,
       });
 
-      await chat.webhooks.gchat(createGoogleChatWebhookRequest(thread1Mention), {
-        waitUntil: tracker.waitUntil,
-      });
+      await chat.webhooks.gchat(
+        createGoogleChatWebhookRequest(thread1Mention),
+        {
+          waitUntil: tracker.waitUntil,
+        },
+      );
       await tracker.waitForAll();
 
       // Start thread 2
@@ -567,9 +582,12 @@ describe("Google Chat Integration", () => {
         hasBotMention: true,
       });
 
-      await chat.webhooks.gchat(createGoogleChatWebhookRequest(thread2Mention), {
-        waitUntil: tracker.waitUntil,
-      });
+      await chat.webhooks.gchat(
+        createGoogleChatWebhookRequest(thread2Mention),
+        {
+          waitUntil: tracker.waitUntil,
+        },
+      );
       await tracker.waitForAll();
 
       mockChatApi.clearMocks();
@@ -584,9 +602,12 @@ describe("Google Chat Integration", () => {
         senderName: "User A",
       });
 
-      await chat.webhooks.gchat(createGoogleChatWebhookRequest(thread1FollowUp), {
-        waitUntil: tracker.waitUntil,
-      });
+      await chat.webhooks.gchat(
+        createGoogleChatWebhookRequest(thread1FollowUp),
+        {
+          waitUntil: tracker.waitUntil,
+        },
+      );
       await tracker.waitForAll();
 
       // Follow-up to thread 2
@@ -599,9 +620,12 @@ describe("Google Chat Integration", () => {
         senderName: "User B",
       });
 
-      await chat.webhooks.gchat(createGoogleChatWebhookRequest(thread2FollowUp), {
-        waitUntil: tracker.waitUntil,
-      });
+      await chat.webhooks.gchat(
+        createGoogleChatWebhookRequest(thread2FollowUp),
+        {
+          waitUntil: tracker.waitUntil,
+        },
+      );
       await tracker.waitForAll();
 
       // Verify thread isolation

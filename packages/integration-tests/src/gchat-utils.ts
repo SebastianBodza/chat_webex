@@ -2,12 +2,13 @@
  * Google Chat test utilities for creating mock APIs, events, and webhook requests.
  */
 
-import { vi } from "vitest";
 import type { GoogleChatAdapter } from "@chat-sdk/gchat";
+import { vi } from "vitest";
 
 export const GCHAT_TEST_CREDENTIALS = {
   client_email: "bot@project.iam.gserviceaccount.com",
-  private_key: "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
+  private_key:
+    "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
   project_id: "test-project",
 };
 
@@ -95,7 +96,9 @@ export function createGoogleChatEvent(options: GoogleChatEventOptions) {
           thread: threadName ? { name: threadName } : undefined,
           createTime: eventTime,
           annotations: annotations.length > 0 ? annotations : undefined,
-          argumentText: hasBotMention ? text.replace(`@${GCHAT_BOT_NAME}`, "").trim() : text,
+          argumentText: hasBotMention
+            ? text.replace(`@${GCHAT_BOT_NAME}`, "").trim()
+            : text,
           space: {
             name: spaceName,
             type: "ROOM",
@@ -128,7 +131,11 @@ export function createGoogleChatWebhookRequest(
  * Create mock Google Chat API
  */
 export function createMockGoogleChatApi() {
-  const sentMessages: Array<{ parent: string; text: string; thread?: { name: string } }> = [];
+  const sentMessages: Array<{
+    parent: string;
+    text: string;
+    thread?: { name: string };
+  }> = [];
   const updatedMessages: Array<{ name: string; text: string }> = [];
   const deletedMessages: string[] = [];
   const addedReactions: Array<{ parent: string; emoji: string }> = [];
@@ -199,7 +206,9 @@ export function createMockGoogleChatApi() {
                 parent: params.parent,
                 emoji: params.requestBody.emoji.unicode,
               });
-              return { data: { name: `${params.parent}/reactions/reaction-1` } };
+              return {
+                data: { name: `${params.parent}/reactions/reaction-1` },
+              };
             },
           ),
         },
@@ -238,7 +247,10 @@ export function injectMockGoogleChatApi(
 /**
  * Get expected Google Chat thread ID format
  */
-export function getGoogleChatThreadId(spaceName: string, threadName?: string): string {
+export function getGoogleChatThreadId(
+  spaceName: string,
+  threadName?: string,
+): string {
   if (threadName) {
     const encodedThread = Buffer.from(threadName).toString("base64url");
     return `gchat:${spaceName}:${encodedThread}`;

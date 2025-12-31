@@ -2,7 +2,7 @@ import { createRedisState } from "@chat-sdk/state-redis";
 import { Chat } from "chat-sdk";
 import { buildAdapters } from "./adapters";
 
-const state = createRedisState({ url: process.env.REDIS_URL! });
+const state = createRedisState({ url: process.env.REDIS_URL || "" });
 const adapters = buildAdapters();
 
 // Create the bot instance
@@ -19,7 +19,7 @@ bot.onNewMention(async (thread, _message) => {
   await thread.startTyping();
   await thread.post(
     `Thanks for mentioning me! I'm now listening to this thread.\n\n` +
-      `_Connected via ${thread.adapter.name}_`
+      `_Connected via ${thread.adapter.name}_`,
   );
 });
 
@@ -51,6 +51,6 @@ bot.onNewMessage(/help/i, async (thread, message) => {
     `Hi ${message.author.userName}! Here's how I can help:\n\n` +
       `• **Mention me** to start a conversation\n` +
       `• I'll respond to messages in threads where I'm mentioned\n` +
-      `• Active platforms: ${platforms}`
+      `• Active platforms: ${platforms}`,
   );
 });
