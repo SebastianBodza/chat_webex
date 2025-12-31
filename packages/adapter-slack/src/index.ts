@@ -74,6 +74,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
   private chat: ChatInstance | null = null;
   private logger: Logger | null = null;
   private _botUserId: string | null = null;
+  private _botId: string | null = null; // Bot app ID (B_xxx) - different from user ID
   private formatConverter = new SlackFormatConverter();
   private static USER_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -93,16 +94,18 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     this.chat = chat;
     this.logger = chat.getLogger(this.name);
 
-    // Fetch bot user ID if not provided
+    // Fetch bot user ID and bot ID if not provided
     if (!this._botUserId) {
       try {
         const authResult = await this.client.auth.test();
         this._botUserId = authResult.user_id as string;
+        this._botId = (authResult.bot_id as string) || null;
         if (authResult.user) {
           (this as { userName: string }).userName = authResult.user as string;
         }
-        this.logger.debug("Slack auth completed", {
+        this.logger.info("Slack auth completed", {
           botUserId: this._botUserId,
+          botId: this._botId,
         });
       } catch (error) {
         this.logger.warn("Could not fetch bot user ID", { error });
@@ -311,10 +314,13 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     threadId: string,
   ): Promise<Message<unknown>> {
     // Check if this message is from our bot
-    // Bot messages have bot_id, user messages have user
-    const isMe = this._botUserId
-      ? event.user === this._botUserId || event.bot_id === this._botUserId
-      : false;
+    // Bot messages have bot_id (B_xxx), user messages have user (U_xxx)
+    // We need to check both since _botUserId is U_xxx and _botId is B_xxx
+    const isMe = !!(
+      (this._botUserId && event.user === this._botUserId) ||
+      (this._botId && event.bot_id === this._botId) ||
+      (this._botUserId && event.bot_id === this._botUserId)
+    );
 
     const text = event.text || "";
 
@@ -542,9 +548,13 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     event: SlackEvent,
     threadId: string,
   ): Message<unknown> {
-    const isMe = this._botUserId
-      ? event.user === this._botUserId || event.bot_id === this._botUserId
-      : false;
+    // Check if this message is from our bot
+    // Bot messages have bot_id (B_xxx), user messages have user (U_xxx)
+    const isMe = !!(
+      (this._botUserId && event.user === this._botUserId) ||
+      (this._botId && event.bot_id === this._botId) ||
+      (this._botUserId && event.bot_id === this._botUserId)
+    );
 
     const text = event.text || "";
     // Without async lookup, fall back to user ID for human users
