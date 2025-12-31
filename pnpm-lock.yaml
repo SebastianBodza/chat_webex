@@ -29,9 +29,6 @@ importers:
       '@chat-sdk/slack':
         specifier: workspace:*
         version: link:../../packages/adapter-slack
-      '@chat-sdk/state-memory':
-        specifier: workspace:*
-        version: link:../../packages/state-memory
       '@chat-sdk/state-redis':
         specifier: workspace:*
         version: link:../../packages/state-redis
