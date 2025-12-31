@@ -593,6 +593,43 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     }
 
     const message = notification.message;
+
+    // Deduplicate messages - same message can arrive via direct webhook (@mention)
+    // and Pub/Sub subscription. Use state to track processed messages.
+    const dedupeKey = `gchat:processed:${message.name}`;
+    const handleTask = (async () => {
+      const alreadyProcessed = await this.state?.get<boolean>(dedupeKey);
+      if (alreadyProcessed) {
+        this.logger?.debug("Skipping duplicate Pub/Sub message", {
+          messageId: message.name,
+        });
+        return;
+      }
+      // Mark as processed with short TTL (60s is enough since duplicates come within seconds)
+      await this.state?.set(dedupeKey, true, 60 * 1000);
+
+      await this.processPubSubMessage(notification, options);
+    })().catch((err) => {
+      this.logger?.error("Pub/Sub message handling error", { error: err });
+    });
+
+    if (options?.waitUntil) {
+      options.waitUntil(handleTask);
+    }
+  }
+
+  /**
+   * Process a Pub/Sub message after deduplication.
+   */
+  private async processPubSubMessage(
+    notification: WorkspaceEventNotification,
+    options?: WebhookOptions,
+  ): Promise<void> {
+    if (!this.chat || !notification.message) {
+      return;
+    }
+
+    const message = notification.message;
     // Extract space name from targetResource: "//chat.googleapis.com/spaces/AAAA"
     const spaceName = notification.targetResource?.replace(
       "//chat.googleapis.com/",
@@ -657,15 +694,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       }
     }
 
-    const handleTask = this.chat
-      .handleIncomingMessage(this, threadId, parsedMessage)
-      .catch((err) => {
-        this.logger?.error("Pub/Sub message handling error", { error: err });
-      });
-
-    if (options?.waitUntil) {
-      options.waitUntil(handleTask);
-    }
+    // Process the message
+    await this.chat.handleIncomingMessage(this, threadId, parsedMessage);
   }
 
   /**
@@ -704,24 +734,36 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       threadName,
     });
 
-    const parsedMessage = this.parseGoogleChatMessage(event, threadId);
-    this.logger?.debug("GChat parsed message", {
-      threadId,
-      messageId: parsedMessage.id,
-      text: parsedMessage.text,
-      authorUserId: parsedMessage.author.userId,
-      authorUserName: parsedMessage.author.userName,
-      isBot: parsedMessage.author.isBot,
-      isMe: parsedMessage.author.isMe,
-      rawEvent: event,
-    });
+    // Deduplicate messages - same message can arrive via direct webhook (@mention)
+    // and Pub/Sub subscription. Use state to track processed messages.
+    const dedupeKey = `gchat:processed:${message.name}`;
+    const handleTask = (async () => {
+      const alreadyProcessed = await this.state?.get<boolean>(dedupeKey);
+      if (alreadyProcessed) {
+        this.logger?.debug("Skipping duplicate webhook message", {
+          messageId: message.name,
+        });
+        return;
+      }
+      // Mark as processed with short TTL (60s is enough since duplicates come within seconds)
+      await this.state?.set(dedupeKey, true, 60 * 1000);
 
-    // Run message handling in background
-    const handleTask = this.chat
-      .handleIncomingMessage(this, threadId, parsedMessage)
-      .catch((err) => {
-        this.logger?.error("Message handling error", { error: err });
+      const parsedMessage = this.parseGoogleChatMessage(event, threadId);
+      this.logger?.debug("GChat parsed message", {
+        threadId,
+        messageId: parsedMessage.id,
+        text: parsedMessage.text,
+        authorUserId: parsedMessage.author.userId,
+        authorUserName: parsedMessage.author.userName,
+        isBot: parsedMessage.author.isBot,
+        isMe: parsedMessage.author.isMe,
+        rawEvent: event,
       });
+
+      await this.chat?.handleIncomingMessage(this, threadId, parsedMessage);
+    })().catch((err) => {
+      this.logger?.error("Message handling error", { error: err });
+    });
 
     if (options?.waitUntil) {
       options.waitUntil(handleTask);

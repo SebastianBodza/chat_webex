@@ -283,6 +283,21 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
 
     // Run message handling in background (async to allow user lookup)
     const handleTask = (async () => {
+      // Deduplicate messages - Slack sends both `message` and `app_mention` events
+      // for @mentions with the same ts (timestamp). Use state to track processed messages.
+      const dedupeKey = `slack:processed:${event.channel}:${event.ts}`;
+      const alreadyProcessed = await this.chat?.getState().get<boolean>(dedupeKey);
+      if (alreadyProcessed) {
+        this.logger?.debug("Skipping duplicate message", {
+          eventType: event.type,
+          channel: event.channel,
+          ts: event.ts,
+        });
+        return;
+      }
+      // Mark as processed with short TTL (60s is enough since duplicates come within seconds)
+      await this.chat?.getState().set(dedupeKey, true, 60 * 1000);
+
       const message = await this.parseSlackMessage(event, threadId);
       this.logger?.debug("Slack parsed message", {
         threadId,
