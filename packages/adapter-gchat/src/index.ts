@@ -544,10 +544,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   ): Response {
     try {
       const notification = decodePubSubMessage(pushMessage);
-      this.logger?.debug("Pub/Sub notification received", {
-        eventType: notification.eventType,
-        subscription: notification.subscription,
-      });
+      this.logger?.info("Pub/Sub notification decoded", { notification });
 
       // Handle message events from Pub/Sub
       if (
