@@ -594,8 +594,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       threadName,
     });
 
-    // Convert to standard message format
-    const text = message.text || "";
+    // Normalize bot mentions and convert to standard message format
+    const text = this.normalizeBotMentions(message);
     const isBot = message.sender?.type === "BOT";
 
     const parsedMessage: Message<unknown> = {
@@ -730,7 +730,9 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       throw new Error("Event has no message payload");
     }
 
-    const text = message.text || "";
+    // Normalize bot mentions: replace @BotDisplayName with @{userName}
+    // so the Chat SDK's mention detection works properly
+    const text = this.normalizeBotMentions(message);
 
     // In Google Chat, if sender.type is "BOT", it's always THIS bot
     // (Google Chat only sends our bot's messages to our webhook)
@@ -959,6 +961,34 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   renderFormatted(content: FormattedContent): string {
     return this.formatConverter.fromAst(content);
+  }
+
+  /**
+   * Normalize bot mentions in message text.
+   * Google Chat uses the bot's display name (e.g., "@Chat SDK Demo") but the
+   * Chat SDK expects "@{userName}" format. This method replaces bot mentions
+   * with the adapter's userName so mention detection works properly.
+   */
+  private normalizeBotMentions(message: GoogleChatMessage): string {
+    let text = message.text || "";
+
+    // Find bot mentions in annotations and replace with @{userName}
+    const annotations = message.annotations || [];
+    for (const annotation of annotations) {
+      if (
+        annotation.type === "USER_MENTION" &&
+        annotation.userMention?.user?.type === "BOT"
+      ) {
+        const botDisplayName = annotation.userMention.user.displayName;
+        if (botDisplayName && annotation.startIndex !== undefined) {
+          // Replace @BotDisplayName with @{userName}
+          const mentionText = `@${botDisplayName}`;
+          text = text.replace(mentionText, `@${this.userName}`);
+        }
+      }
+    }
+
+    return text;
   }
 
   private handleGoogleChatError(error: unknown): never {
