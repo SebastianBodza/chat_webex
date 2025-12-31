@@ -256,6 +256,9 @@ export async function deleteSpaceSubscription(
 /**
  * Decode a Pub/Sub push message into a Workspace Event notification.
  *
+ * The message uses CloudEvents format where event metadata is in attributes
+ * (ce-type, ce-source, ce-subject, ce-time) and the payload is base64 encoded.
+ *
  * @example
  * ```typescript
  * // In your /api/webhooks/gchat/pubsub route:
@@ -271,10 +274,22 @@ export async function deleteSpaceSubscription(
 export function decodePubSubMessage(
   pushMessage: PubSubPushMessage,
 ): WorkspaceEventNotification {
+  // Decode the base64 payload
   const data = Buffer.from(pushMessage.message.data, "base64").toString(
     "utf-8",
   );
-  return JSON.parse(data) as WorkspaceEventNotification;
+  const payload = JSON.parse(data) as { message?: GoogleChatMessage };
+
+  // Extract CloudEvents metadata from attributes
+  const attributes = pushMessage.message.attributes || {};
+
+  return {
+    subscription: pushMessage.subscription,
+    targetResource: attributes["ce-subject"] || "",
+    eventType: attributes["ce-type"] || "",
+    eventTime: attributes["ce-time"] || pushMessage.message.publishTime,
+    message: payload.message,
+  };
 }
 
 /**
