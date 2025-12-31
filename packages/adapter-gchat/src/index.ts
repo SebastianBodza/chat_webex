@@ -191,6 +191,8 @@ interface SpaceSubscriptionInfo {
 export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   readonly name = "gchat";
   readonly userName: string;
+  /** Bot's user ID (e.g., "users/123...") - learned from annotations */
+  botUserId?: string;
 
   private chatApi: chat_v1.Chat;
   private chat: ChatInstance | null = null;
@@ -249,6 +251,17 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     this.chat = chat;
     this.state = chat.getState();
     this.logger = chat.getLogger(this.name);
+
+    // Restore persisted bot user ID from state (for serverless environments)
+    if (!this.botUserId) {
+      const savedBotUserId = await this.state.get<string>("gchat:botUserId");
+      if (savedBotUserId) {
+        this.botUserId = savedBotUserId;
+        this.logger?.debug("Restored bot user ID from state", {
+          botUserId: this.botUserId,
+        });
+      }
+    }
   }
 
   /**
@@ -594,6 +607,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     // Normalize bot mentions and convert to standard message format
     const text = this.normalizeBotMentions(message);
     const isBot = message.sender?.type === "BOT";
+    const isMe = this.isMessageFromSelf(message);
 
     const parsedMessage: Message<unknown> = {
       id: message.name,
@@ -606,7 +620,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         userName: message.sender?.displayName || "unknown",
         fullName: message.sender?.displayName || "unknown",
         isBot,
-        isMe: isBot,
+        isMe,
       },
       metadata: {
         dateSent: new Date(message.createTime),
@@ -731,9 +745,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     // so the Chat SDK's mention detection works properly
     const text = this.normalizeBotMentions(message);
 
-    // In Google Chat, if sender.type is "BOT", it's always THIS bot
-    // (Google Chat only sends our bot's messages to our webhook)
     const isBot = message.sender?.type === "BOT";
+    const isMe = this.isMessageFromSelf(message);
 
     return {
       id: message.name,
@@ -746,7 +759,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         userName: message.sender?.displayName || "unknown",
         fullName: message.sender?.displayName || "unknown",
         isBot,
-        isMe: isBot,
+        isMe,
       },
       metadata: {
         dateSent: new Date(message.createTime),
@@ -965,6 +978,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    * Google Chat uses the bot's display name (e.g., "@Chat SDK Demo") but the
    * Chat SDK expects "@{userName}" format. This method replaces bot mentions
    * with the adapter's userName so mention detection works properly.
+   * Also learns the bot's user ID from annotations for isMe detection.
    */
   private normalizeBotMentions(message: GoogleChatMessage): string {
     let text = message.text || "";
@@ -976,7 +990,23 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         annotation.type === "USER_MENTION" &&
         annotation.userMention?.user?.type === "BOT"
       ) {
-        const botDisplayName = annotation.userMention.user.displayName;
+        const botUser = annotation.userMention.user;
+        const botDisplayName = botUser.displayName;
+
+        // Learn our bot's user ID from mentions and persist to state
+        if (botUser.name && !this.botUserId) {
+          this.botUserId = botUser.name;
+          this.logger?.info("Learned bot user ID from mention", {
+            botUserId: this.botUserId,
+          });
+          // Persist to state for serverless environments
+          this.state
+            ?.set("gchat:botUserId", this.botUserId)
+            .catch((err) =>
+              this.logger?.debug("Failed to persist botUserId", { error: err }),
+            );
+        }
+
         if (botDisplayName && annotation.startIndex !== undefined) {
           // Replace @BotDisplayName with @{userName}
           const mentionText = `@${botDisplayName}`;
@@ -986,6 +1016,23 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     }
 
     return text;
+  }
+
+  /**
+   * Check if a message is from this bot.
+   */
+  private isMessageFromSelf(message: GoogleChatMessage): boolean {
+    const senderType = message.sender?.type;
+    const senderId = message.sender?.name;
+
+    // If we know our bot's user ID, use it for precise matching
+    if (this.botUserId && senderId) {
+      return senderId === this.botUserId;
+    }
+
+    // Fallback: assume all BOT messages are from us
+    // (This is safe for direct webhooks but may miss other bots in Pub/Sub)
+    return senderType === "BOT";
   }
 
   private handleGoogleChatError(error: unknown): never {
