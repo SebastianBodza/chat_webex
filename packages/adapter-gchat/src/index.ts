@@ -47,6 +47,12 @@ export interface GoogleChatAdapterBaseConfig {
    * Format: "projects/my-project/topics/my-topic"
    */
   pubsubTopic?: string;
+  /**
+   * User email to impersonate for Workspace Events API calls.
+   * Required when using domain-wide delegation.
+   * This user must have access to the Chat spaces you want to subscribe to.
+   */
+  impersonateUser?: string;
 }
 
 /** Config using service account credentials (JSON key file) */
@@ -196,12 +202,15 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   private useADC = false;
   /** Custom auth client (e.g., Vercel OIDC) */
   private customAuth?: Parameters<typeof google.chat>[0]["auth"];
+  /** User email to impersonate for Workspace Events API (domain-wide delegation) */
+  private impersonateUser?: string;
   /** In-progress subscription creations to prevent duplicate requests */
   private pendingSubscriptions = new Map<string, Promise<void>>();
 
   constructor(config: GoogleChatAdapterConfig) {
     this.userName = config.userName || "bot";
     this.pubsubTopic = config.pubsubTopic;
+    this.impersonateUser = config.impersonateUser;
 
     let auth: Parameters<typeof google.chat>[0]["auth"];
 
@@ -445,10 +454,16 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    */
   private getAuthOptions(): WorkspaceEventsAuthOptions | null {
     if (this.credentials) {
-      return { credentials: this.credentials };
+      return {
+        credentials: this.credentials,
+        impersonateUser: this.impersonateUser,
+      };
     }
     if (this.useADC) {
-      return { useApplicationDefaultCredentials: true as const };
+      return {
+        useApplicationDefaultCredentials: true as const,
+        impersonateUser: this.impersonateUser,
+      };
     }
     if (this.customAuth) {
       return { auth: this.customAuth };

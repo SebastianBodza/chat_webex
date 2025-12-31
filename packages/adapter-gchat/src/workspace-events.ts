@@ -73,8 +73,8 @@ export interface ServiceAccountCredentials {
 
 /** Auth options - service account, ADC, or custom auth client */
 export type WorkspaceEventsAuthOptions =
-  | { credentials: ServiceAccountCredentials }
-  | { useApplicationDefaultCredentials: true }
+  | { credentials: ServiceAccountCredentials; impersonateUser?: string }
+  | { useApplicationDefaultCredentials: true; impersonateUser?: string }
   | { auth: Parameters<typeof google.workspaceevents>[0]["auth"] };
 
 /**
@@ -111,6 +111,8 @@ export async function createSpaceSubscription(
     authClient = new google.auth.JWT({
       email: auth.credentials.client_email,
       key: auth.credentials.private_key,
+      // For domain-wide delegation, impersonate a user
+      subject: auth.impersonateUser,
       scopes: [
         "https://www.googleapis.com/auth/chat.spaces.readonly",
         "https://www.googleapis.com/auth/chat.messages.readonly",
@@ -118,6 +120,7 @@ export async function createSpaceSubscription(
     });
   } else if ("useApplicationDefaultCredentials" in auth) {
     authClient = new google.auth.GoogleAuth({
+      // Note: ADC with impersonation requires different setup
       scopes: [
         "https://www.googleapis.com/auth/chat.spaces.readonly",
         "https://www.googleapis.com/auth/chat.messages.readonly",
@@ -187,6 +190,7 @@ export async function listSpaceSubscriptions(
     authClient = new google.auth.JWT({
       email: auth.credentials.client_email,
       key: auth.credentials.private_key,
+      subject: auth.impersonateUser,
       scopes: ["https://www.googleapis.com/auth/chat.spaces.readonly"],
     });
   } else if ("useApplicationDefaultCredentials" in auth) {
@@ -227,6 +231,7 @@ export async function deleteSpaceSubscription(
     authClient = new google.auth.JWT({
       email: auth.credentials.client_email,
       key: auth.credentials.private_key,
+      subject: auth.impersonateUser,
       scopes: ["https://www.googleapis.com/auth/chat.spaces.readonly"],
     });
   } else if ("useApplicationDefaultCredentials" in auth) {

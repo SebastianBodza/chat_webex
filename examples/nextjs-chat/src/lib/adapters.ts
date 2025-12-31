@@ -94,6 +94,8 @@ export function buildAdapters(): Adapters {
   // Optional: Pub/Sub topic for receiving ALL messages (not just @mentions)
   // When set, subscriptions are auto-created when bot is added to a space
   const pubsubTopic = process.env.GOOGLE_CHAT_PUBSUB_TOPIC;
+  // User email to impersonate for Workspace Events API (domain-wide delegation)
+  const impersonateUser = process.env.GOOGLE_CHAT_IMPERSONATE_USER;
 
   // Option 1: Service account credentials (JSON key) - supports Pub/Sub subscriptions
   if (process.env.GOOGLE_CHAT_CREDENTIALS) {
@@ -101,7 +103,8 @@ export function buildAdapters(): Adapters {
       const credentials = JSON.parse(process.env.GOOGLE_CHAT_CREDENTIALS);
       adapters.gchat = createGoogleChatAdapter({
         credentials,
-        pubsubTopic, // Auto-subscribe when threads are subscribed
+        pubsubTopic,
+        impersonateUser, // Domain-wide delegation for Workspace Events
       });
     } catch (e) {
       console.warn("[bot] Failed to parse GOOGLE_CHAT_CREDENTIALS:", e);
@@ -111,7 +114,8 @@ export function buildAdapters(): Adapters {
   else if (process.env.GOOGLE_CHAT_USE_ADC === "true") {
     adapters.gchat = createGoogleChatAdapter({
       useApplicationDefaultCredentials: true,
-      pubsubTopic, // Auto-subscribe when threads are subscribed
+      pubsubTopic,
+      impersonateUser, // Domain-wide delegation for Workspace Events
     });
   }
   // Option 3: Vercel OIDC (Workload Identity Federation)
@@ -121,7 +125,8 @@ export function buildAdapters(): Adapters {
     adapters.gchat = createGoogleChatAdapter({
       auth: vercelAuth,
       userName: "Chat SDK Demo",
-      pubsubTopic, // Now supported with custom auth
+      pubsubTopic,
+      impersonateUser, // Domain-wide delegation for Workspace Events
     });
   }
 
