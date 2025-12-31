@@ -90,33 +90,33 @@ export function buildAdapters(): Adapters {
   // When set, subscriptions are auto-created when bot is added to a space
   const pubsubTopic = process.env.GOOGLE_CHAT_PUBSUB_TOPIC;
 
-  // Option 1: Vercel OIDC (Workload Identity Federation)
-  // Note: Auto-subscription requires credentials or ADC, not custom auth
-  const vercelAuth = createVercelOIDCAuth();
-  if (vercelAuth) {
-    adapters.gchat = createGoogleChatAdapter({
-      auth: vercelAuth,
-      userName: "Chat SDK Demo",
-      // pubsubTopic not supported with custom auth - use /api/gchat/subscribe manually
-    });
-  }
-  // Option 2: Service account credentials (JSON key)
-  else if (process.env.GOOGLE_CHAT_CREDENTIALS) {
+  // Option 1: Service account credentials (JSON key) - supports Pub/Sub subscriptions
+  if (process.env.GOOGLE_CHAT_CREDENTIALS) {
     try {
       const credentials = JSON.parse(process.env.GOOGLE_CHAT_CREDENTIALS);
       adapters.gchat = createGoogleChatAdapter({
         credentials,
-        pubsubTopic, // Auto-subscribe when added to spaces
+        pubsubTopic, // Auto-subscribe when threads are subscribed
       });
     } catch (e) {
       console.warn("[bot] Failed to parse GOOGLE_CHAT_CREDENTIALS:", e);
     }
   }
-  // Option 3: Application Default Credentials (ADC)
+  // Option 2: Application Default Credentials (ADC) - supports Pub/Sub subscriptions
   else if (process.env.GOOGLE_CHAT_USE_ADC === "true") {
     adapters.gchat = createGoogleChatAdapter({
       useApplicationDefaultCredentials: true,
-      pubsubTopic, // Auto-subscribe when added to spaces
+      pubsubTopic, // Auto-subscribe when threads are subscribed
+    });
+  }
+  // Option 3: Vercel OIDC (Workload Identity Federation) - NO Pub/Sub support
+  // Note: Workspace Events API requires credentials or ADC, not custom auth
+  else {
+    const vercelAuth = createVercelOIDCAuth();
+    adapters.gchat = createGoogleChatAdapter({
+      auth: vercelAuth,
+      userName: "Chat SDK Demo",
+      // pubsubTopic not supported - Workspace Events API can't use custom auth
     });
   }
 

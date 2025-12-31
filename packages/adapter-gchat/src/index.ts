@@ -194,6 +194,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   private pubsubTopic?: string;
   private credentials?: ServiceAccountCredentials;
   private useADC = false;
+  /** Custom auth client (e.g., Vercel OIDC) */
+  private customAuth?: Parameters<typeof google.chat>[0]["auth"];
   /** In-progress subscription creations to prevent duplicate requests */
   private pendingSubscriptions = new Map<string, Promise<void>>();
 
@@ -222,7 +224,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         scopes: ["https://www.googleapis.com/auth/chat.bot"],
       });
     } else if ("auth" in config && config.auth) {
-      // Custom auth client provided directly
+      // Custom auth client provided directly (e.g., Vercel OIDC)
+      this.customAuth = config.auth;
       auth = config.auth;
     } else {
       throw new Error(
@@ -244,9 +247,15 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    * Ensures the space has a Workspace Events subscription so we receive all messages.
    */
   async onThreadSubscribe(threadId: string): Promise<void> {
+    this.logger?.info("onThreadSubscribe called", {
+      threadId,
+      hasPubsubTopic: !!this.pubsubTopic,
+      pubsubTopic: this.pubsubTopic,
+    });
+
     if (!this.pubsubTopic) {
-      this.logger?.debug(
-        "No pubsubTopic configured, skipping space subscription",
+      this.logger?.warn(
+        "No pubsubTopic configured, skipping space subscription. Set GOOGLE_CHAT_PUBSUB_TOPIC env var.",
       );
       return;
     }
@@ -260,7 +269,19 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
    * Creates one if it doesn't exist or is about to expire.
    */
   private async ensureSpaceSubscription(spaceName: string): Promise<void> {
+    this.logger?.info("ensureSpaceSubscription called", {
+      spaceName,
+      hasPubsubTopic: !!this.pubsubTopic,
+      hasState: !!this.state,
+      hasCredentials: !!this.credentials,
+      hasADC: this.useADC,
+    });
+
     if (!this.pubsubTopic || !this.state) {
+      this.logger?.warn("ensureSpaceSubscription skipped - missing config", {
+        hasPubsubTopic: !!this.pubsubTopic,
+        hasState: !!this.state,
+      });
       return;
     }
 
@@ -314,9 +335,16 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     cacheKey: string,
   ): Promise<void> {
     const authOptions = this.getAuthOptions();
+    this.logger?.info("createSpaceSubscriptionWithCache", {
+      spaceName,
+      hasAuthOptions: !!authOptions,
+      hasCredentials: !!this.credentials,
+      hasADC: this.useADC,
+    });
+
     if (!authOptions) {
-      this.logger?.warn(
-        "Cannot create subscription: no credentials available (custom auth not supported)",
+      this.logger?.error(
+        "Cannot create subscription: no credentials available. Custom auth (Vercel OIDC) not supported for Workspace Events. Use GOOGLE_CHAT_CREDENTIALS or GOOGLE_CHAT_USE_ADC=true instead.",
       );
       return;
     }

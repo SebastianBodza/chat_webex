@@ -71,10 +71,11 @@ export interface ServiceAccountCredentials {
   project_id?: string;
 }
 
-/** Auth options - either service account or ADC */
+/** Auth options - service account, ADC, or custom auth client */
 export type WorkspaceEventsAuthOptions =
   | { credentials: ServiceAccountCredentials }
-  | { useApplicationDefaultCredentials: true };
+  | { useApplicationDefaultCredentials: true }
+  | { auth: Parameters<typeof google.workspaceevents>[0]["auth"] };
 
 /**
  * Create a Workspace Events subscription to receive all messages in a Chat space.
@@ -115,13 +116,16 @@ export async function createSpaceSubscription(
         "https://www.googleapis.com/auth/chat.messages.readonly",
       ],
     });
-  } else {
+  } else if ("useApplicationDefaultCredentials" in auth) {
     authClient = new google.auth.GoogleAuth({
       scopes: [
         "https://www.googleapis.com/auth/chat.spaces.readonly",
         "https://www.googleapis.com/auth/chat.messages.readonly",
       ],
     });
+  } else {
+    // Custom auth client (e.g., Vercel OIDC)
+    authClient = auth.auth;
   }
 
   const workspaceEvents = google.workspaceevents({
