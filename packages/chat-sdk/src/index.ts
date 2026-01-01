@@ -71,5 +71,11 @@ export type {
   WebhookOptions,
 } from "./types";
 
-// Logger
-export { ChatError, ConsoleLogger, LockError, RateLimitError } from "./types";
+// Errors and Logger
+export {
+  ChatError,
+  ConsoleLogger,
+  LockError,
+  NotImplementedError,
+  RateLimitError,
+} from "./types";

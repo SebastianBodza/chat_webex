@@ -226,18 +226,22 @@ describe("Google Chat Integration", () => {
       );
     });
 
-    it("should skip messages from bots", async () => {
+    it("should skip messages from this bot (isMe)", async () => {
       const handlerMock = vi.fn();
       chat.onNewMessage(/./, async () => {
         handlerMock();
       });
+
+      // Set the bot's user ID so it can identify its own messages
+      const botUserId = "users/bot-user-123";
+      gchatAdapter.botUserId = botUserId;
 
       const event = createGoogleChatEvent({
         text: "Bot's own message",
         messageName: `${TEST_SPACE_NAME}/messages/msg-001`,
         spaceName: TEST_SPACE_NAME,
         threadName: TEST_THREAD_NAME,
-        senderId: "users/bot-user-id",
+        senderId: botUserId, // Same as the bot's user ID
         senderName: GCHAT_BOT_NAME,
         senderType: "BOT",
       });
@@ -248,6 +252,35 @@ describe("Google Chat Integration", () => {
       await tracker.waitForAll();
 
       expect(handlerMock).not.toHaveBeenCalled();
+    });
+
+    it("should process messages from other bots (not isMe)", async () => {
+      const handlerMock = vi.fn();
+      chat.onNewMessage(/./, async () => {
+        handlerMock();
+      });
+
+      // Set the bot's user ID
+      gchatAdapter.botUserId = "users/my-bot-123";
+
+      // Send a message from a DIFFERENT bot
+      const event = createGoogleChatEvent({
+        text: "Message from another bot",
+        messageName: `${TEST_SPACE_NAME}/messages/msg-001`,
+        spaceName: TEST_SPACE_NAME,
+        threadName: TEST_THREAD_NAME,
+        senderId: "users/other-bot-456", // Different bot
+        senderName: "Other Bot",
+        senderType: "BOT",
+      });
+
+      await chat.webhooks.gchat(createGoogleChatWebhookRequest(event), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Should process messages from other bots
+      expect(handlerMock).toHaveBeenCalled();
     });
   });
 

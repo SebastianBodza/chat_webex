@@ -16,7 +16,7 @@ import {
 import { createSlackAdapter, type SlackAdapter } from "@chat-sdk/slack";
 import { createMemoryState } from "@chat-sdk/state-memory";
 import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
-import { Chat } from "chat-sdk";
+import { Chat, type Message, type Thread } from "chat-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import gchatFixtures from "../fixtures/replay/gchat.json";
 import slackFixtures from "../fixtures/replay/slack.json";
@@ -79,15 +79,30 @@ function createTeamsRequest(body: unknown): Request {
 describe("Replay Tests", () => {
   describe("Google Chat", () => {
     let chat: Chat<{ gchat: GoogleChatAdapter }>;
+    let gchatAdapter: GoogleChatAdapter;
     let mockChatApi: MockGoogleChatApi;
     let tracker: ReturnType<typeof createWaitUntilTracker>;
 
+    // Captured data for assertions
+    let capturedMentionMessage: Message | null = null;
+    let capturedMentionThread: Thread | null = null;
+    let capturedFollowUpMessage: Message | null = null;
+    let capturedFollowUpThread: Thread | null = null;
+
     beforeEach(() => {
       vi.clearAllMocks();
-      const gchatAdapter = createGoogleChatAdapter({
+      capturedMentionMessage = null;
+      capturedMentionThread = null;
+      capturedFollowUpMessage = null;
+      capturedFollowUpThread = null;
+
+      gchatAdapter = createGoogleChatAdapter({
         credentials: GCHAT_TEST_CREDENTIALS,
         userName: gchatFixtures.botName,
       });
+      // Set the bot user ID so isMe detection works
+      gchatAdapter.botUserId = gchatFixtures.botUserId;
+
       mockChatApi = createMockGoogleChatApi();
       injectMockGoogleChatApi(gchatAdapter, mockChatApi);
       chat = new Chat({
@@ -96,15 +111,22 @@ describe("Replay Tests", () => {
         state: createMemoryState(),
         logger: "error",
       });
-      chat.onNewMention(async (thread) => {
+
+      chat.onNewMention(async (thread, message) => {
+        capturedMentionMessage = message;
+        capturedMentionThread = thread;
         await thread.subscribe();
         await thread.post("Thanks for mentioning me!");
       });
-      chat.onSubscribedMessage(async (thread) => {
+
+      chat.onSubscribedMessage(async (thread, message) => {
+        capturedFollowUpMessage = message;
+        capturedFollowUpThread = thread;
         const msg = await thread.post("Processing...");
         await msg.edit("Just a little bit...");
         await msg.edit("Thanks for your message");
       });
+
       tracker = createWaitUntilTracker();
     });
 
@@ -112,24 +134,77 @@ describe("Replay Tests", () => {
       await chat.shutdown();
     });
 
-    it("should replay @mention and follow-up", async () => {
-      // Step 1: @mention
+    it("should replay @mention with correct message properties", async () => {
       await chat.webhooks.gchat(createGchatRequest(gchatFixtures.mention), {
         waitUntil: tracker.waitUntil,
       });
       await tracker.waitForAll();
+
+      // Verify message was captured
+      expect(capturedMentionMessage).not.toBeNull();
+      expect(capturedMentionThread).not.toBeNull();
+
+      // Verify message text (bot mention normalized to @{userName})
+      expect(capturedMentionMessage?.text).toContain("hello");
+
+      // Verify author properties
+      expect(capturedMentionMessage?.author).toMatchObject({
+        userId: "users/117994873354375860089",
+        userName: "Malte Ubl",
+        fullName: "Malte Ubl",
+        isBot: false,
+        isMe: false,
+      });
+
+      // Verify thread properties
+      expect(capturedMentionThread?.id).toContain("gchat:");
+      expect(capturedMentionThread?.adapter.name).toBe("gchat");
+
+      // Verify recent messages includes the mention
+      expect(capturedMentionThread?.recentMessages).toHaveLength(1);
+      expect(capturedMentionThread?.recentMessages[0]).toBe(
+        capturedMentionMessage,
+      );
+
+      // Verify bot response was sent
       expect(mockChatApi.sentMessages).toContainEqual(
         expect.objectContaining({
           text: expect.stringContaining("Thanks for mentioning me!"),
         }),
       );
+    });
+
+    it("should replay follow-up with correct message properties", async () => {
+      // First send mention to subscribe
+      await chat.webhooks.gchat(createGchatRequest(gchatFixtures.mention), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
       mockChatApi.clearMocks();
 
-      // Step 2: Follow-up via Pub/Sub
+      // Send follow-up via Pub/Sub
       await chat.webhooks.gchat(createGchatRequest(gchatFixtures.followUp), {
         waitUntil: tracker.waitUntil,
       });
       await tracker.waitForAll();
+
+      // Verify follow-up message was captured
+      expect(capturedFollowUpMessage).not.toBeNull();
+      expect(capturedFollowUpThread).not.toBeNull();
+
+      // Verify message text
+      expect(capturedFollowUpMessage?.text).toBe("Hey");
+
+      // Verify author is human, not the bot
+      expect(capturedFollowUpMessage?.author).toMatchObject({
+        isBot: false,
+        isMe: false,
+      });
+
+      // Verify thread has recent messages
+      expect(capturedFollowUpThread?.recentMessages.length).toBeGreaterThan(0);
+
+      // Verify responses
       expect(mockChatApi.sentMessages).toContainEqual(
         expect.objectContaining({ text: "Processing..." }),
       );
@@ -141,12 +216,24 @@ describe("Replay Tests", () => {
 
   describe("Slack", () => {
     let chat: Chat<{ slack: SlackAdapter }>;
+    let slackAdapter: SlackAdapter;
     let mockSlackClient: MockSlackClient;
     let tracker: ReturnType<typeof createWaitUntilTracker>;
 
+    // Captured data for assertions
+    let capturedMentionMessage: Message | null = null;
+    let capturedMentionThread: Thread | null = null;
+    let capturedFollowUpMessage: Message | null = null;
+    let capturedFollowUpThread: Thread | null = null;
+
     beforeEach(() => {
       vi.clearAllMocks();
-      const slackAdapter = createSlackAdapter({
+      capturedMentionMessage = null;
+      capturedMentionThread = null;
+      capturedFollowUpMessage = null;
+      capturedFollowUpThread = null;
+
+      slackAdapter = createSlackAdapter({
         botToken: SLACK_BOT_TOKEN,
         signingSecret: SLACK_SIGNING_SECRET,
       });
@@ -157,21 +244,29 @@ describe("Replay Tests", () => {
         user: slackFixtures.botName,
       });
       injectMockSlackClient(slackAdapter, mockSlackClient);
+
       chat = new Chat({
         userName: slackFixtures.botName,
         adapters: { slack: slackAdapter },
         state: createMemoryState(),
         logger: "error",
       });
-      chat.onNewMention(async (thread) => {
+
+      chat.onNewMention(async (thread, message) => {
+        capturedMentionMessage = message;
+        capturedMentionThread = thread;
         await thread.subscribe();
         await thread.post("Thanks for mentioning me!");
       });
-      chat.onSubscribedMessage(async (thread) => {
+
+      chat.onSubscribedMessage(async (thread, message) => {
+        capturedFollowUpMessage = message;
+        capturedFollowUpThread = thread;
         const msg = await thread.post("Processing...");
         await msg.edit("Just a little bit...");
         await msg.edit("Thanks for your message");
       });
+
       tracker = createWaitUntilTracker();
     });
 
@@ -179,36 +274,126 @@ describe("Replay Tests", () => {
       await chat.shutdown();
     });
 
-    it("should replay @mention and follow-up", async () => {
-      // Step 1: @mention
+    it("should replay @mention with correct message properties", async () => {
       await chat.webhooks.slack(
         createSignedSlackRequest(JSON.stringify(slackFixtures.mention)),
-        {
-          waitUntil: tracker.waitUntil,
-        },
+        { waitUntil: tracker.waitUntil },
       );
       await tracker.waitForAll();
+
+      // Verify message was captured
+      expect(capturedMentionMessage).not.toBeNull();
+      expect(capturedMentionThread).not.toBeNull();
+
+      // Verify message text contains mention and content
+      // Slack format: <@U0A56JUFP9A> Hey
+      expect(capturedMentionMessage?.text).toContain("Hey");
+
+      // Verify author properties
+      expect(capturedMentionMessage?.author).toMatchObject({
+        userId: "U03STHCA1JM", // Human user ID
+        isBot: false,
+        isMe: false,
+      });
+
+      // Verify thread properties
+      expect(capturedMentionThread?.id).toContain("slack:");
+      expect(capturedMentionThread?.id).toContain("C0A511MBCUW"); // Channel ID
+      expect(capturedMentionThread?.adapter.name).toBe("slack");
+
+      // Verify recent messages includes the mention
+      expect(capturedMentionThread?.recentMessages).toHaveLength(1);
+      expect(capturedMentionThread?.recentMessages[0]).toBe(
+        capturedMentionMessage,
+      );
+
+      // Verify bot response was sent
       expect(mockSlackClient.chat.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           text: expect.stringContaining("Thanks for mentioning me!"),
         }),
       );
-      vi.clearAllMocks();
+    });
 
-      // Step 2: Follow-up
+    it("should replay follow-up with correct message properties", async () => {
+      // First send mention to subscribe
       await chat.webhooks.slack(
-        createSignedSlackRequest(JSON.stringify(slackFixtures.followUp)),
-        {
-          waitUntil: tracker.waitUntil,
-        },
+        createSignedSlackRequest(JSON.stringify(slackFixtures.mention)),
+        { waitUntil: tracker.waitUntil },
       );
       await tracker.waitForAll();
+      vi.clearAllMocks();
+
+      // Send follow-up in thread
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(slackFixtures.followUp)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+
+      // Verify follow-up message was captured
+      expect(capturedFollowUpMessage).not.toBeNull();
+      expect(capturedFollowUpThread).not.toBeNull();
+
+      // Verify message text
+      expect(capturedFollowUpMessage?.text).toBe("Hi");
+
+      // Verify author is human, not the bot
+      expect(capturedFollowUpMessage?.author).toMatchObject({
+        userId: "U03STHCA1JM",
+        isBot: false,
+        isMe: false,
+      });
+
+      // Verify thread ID matches (same thread as mention)
+      expect(capturedFollowUpThread?.id).toContain("slack:");
+      expect(capturedFollowUpThread?.id).toContain("1767224888.280449"); // thread_ts
+
+      // Verify thread has recent messages
+      expect(capturedFollowUpThread?.recentMessages.length).toBeGreaterThan(0);
+
+      // Verify responses
       expect(mockSlackClient.chat.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ text: "Processing..." }),
       );
       expect(mockSlackClient.chat.update).toHaveBeenCalledWith(
         expect.objectContaining({ text: "Thanks for your message" }),
       );
+    });
+
+    it("should correctly identify bot messages as isMe", async () => {
+      // Create a message from the bot itself
+      const botMessage = {
+        ...slackFixtures.followUp,
+        event: {
+          ...slackFixtures.followUp.event,
+          user: slackFixtures.botUserId, // Bot's own user ID
+          text: "Bot's own message",
+        },
+      };
+
+      // First subscribe via mention
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(slackFixtures.mention)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+
+      // Track if handler was called
+      let botMessageHandlerCalled = false;
+      chat.onSubscribedMessage(async () => {
+        botMessageHandlerCalled = true;
+      });
+
+      // Send bot's own message - should be skipped
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(botMessage)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+
+      // Handler should NOT be called for bot's own messages
+      expect(botMessageHandlerCalled).toBe(false);
     });
   });
 
@@ -217,8 +402,19 @@ describe("Replay Tests", () => {
     let mockBotAdapter: MockBotAdapter;
     let tracker: ReturnType<typeof createWaitUntilTracker>;
 
+    // Captured data for assertions
+    let capturedMentionMessage: Message | null = null;
+    let capturedMentionThread: Thread | null = null;
+    let capturedFollowUpMessage: Message | null = null;
+    let capturedFollowUpThread: Thread | null = null;
+
     beforeEach(() => {
       vi.clearAllMocks();
+      capturedMentionMessage = null;
+      capturedMentionThread = null;
+      capturedFollowUpMessage = null;
+      capturedFollowUpThread = null;
+
       const teamsAdapter = createTeamsAdapter({
         appId: teamsFixtures.appId,
         appPassword: TEAMS_APP_PASSWORD,
@@ -226,21 +422,29 @@ describe("Replay Tests", () => {
       });
       mockBotAdapter = createMockBotAdapter();
       injectMockBotAdapter(teamsAdapter, mockBotAdapter);
+
       chat = new Chat({
         userName: teamsFixtures.botName,
         adapters: { teams: teamsAdapter },
         state: createMemoryState(),
         logger: "error",
       });
-      chat.onNewMention(async (thread) => {
+
+      chat.onNewMention(async (thread, message) => {
+        capturedMentionMessage = message;
+        capturedMentionThread = thread;
         await thread.subscribe();
         await thread.post("Thanks for mentioning me!");
       });
-      chat.onSubscribedMessage(async (thread) => {
+
+      chat.onSubscribedMessage(async (thread, message) => {
+        capturedFollowUpMessage = message;
+        capturedFollowUpThread = thread;
         const msg = await thread.post("Processing...");
         await msg.edit("Just a little bit...");
         await msg.edit("Thanks for your message");
       });
+
       tracker = createWaitUntilTracker();
     });
 
@@ -248,30 +452,116 @@ describe("Replay Tests", () => {
       await chat.shutdown();
     });
 
-    it("should replay @mention and follow-up", async () => {
-      // Step 1: @mention
+    it("should replay @mention with correct message properties", async () => {
       await chat.webhooks.teams(createTeamsRequest(teamsFixtures.mention), {
         waitUntil: tracker.waitUntil,
       });
       await tracker.waitForAll();
+
+      // Verify message was captured
+      expect(capturedMentionMessage).not.toBeNull();
+      expect(capturedMentionThread).not.toBeNull();
+
+      // Verify message text (Teams format converts <at>name</at> to @name)
+      expect(capturedMentionMessage?.text).toContain("Hey");
+
+      // Verify author properties
+      expect(capturedMentionMessage?.author).toMatchObject({
+        userId: expect.stringContaining("29:"), // Teams user ID format
+        userName: "Malte Ubl",
+        fullName: "Malte Ubl",
+        isMe: false,
+      });
+
+      // Verify thread properties
+      expect(capturedMentionThread?.id).toContain("teams:");
+      expect(capturedMentionThread?.adapter.name).toBe("teams");
+
+      // Verify recent messages includes the mention
+      expect(capturedMentionThread?.recentMessages).toHaveLength(1);
+      expect(capturedMentionThread?.recentMessages[0]).toBe(
+        capturedMentionMessage,
+      );
+
+      // Verify bot response was sent
       expect(mockBotAdapter.sentActivities).toContainEqual(
         expect.objectContaining({
           text: expect.stringContaining("Thanks for mentioning me!"),
         }),
       );
+    });
+
+    it("should replay follow-up with correct message properties", async () => {
+      // First send mention to subscribe
+      await chat.webhooks.teams(createTeamsRequest(teamsFixtures.mention), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
       mockBotAdapter.clearMocks();
 
-      // Step 2: Follow-up
+      // Send follow-up
       await chat.webhooks.teams(createTeamsRequest(teamsFixtures.followUp), {
         waitUntil: tracker.waitUntil,
       });
       await tracker.waitForAll();
+
+      // Verify follow-up message was captured
+      expect(capturedFollowUpMessage).not.toBeNull();
+      expect(capturedFollowUpThread).not.toBeNull();
+
+      // Verify message text
+      expect(capturedFollowUpMessage?.text).toBe("Hi");
+
+      // Verify author is human, not the bot
+      expect(capturedFollowUpMessage?.author).toMatchObject({
+        userName: "Malte Ubl",
+        isMe: false,
+      });
+
+      // Verify thread has recent messages
+      expect(capturedFollowUpThread?.recentMessages.length).toBeGreaterThan(0);
+
+      // Verify responses
       expect(mockBotAdapter.sentActivities).toContainEqual(
         expect.objectContaining({ text: "Processing..." }),
       );
       expect(mockBotAdapter.updatedActivities).toContainEqual(
         expect.objectContaining({ text: "Thanks for your message" }),
       );
+    });
+
+    it("should correctly identify bot messages as isMe", async () => {
+      // Create a message from the bot itself
+      const botMessage = {
+        ...teamsFixtures.followUp,
+        from: {
+          // Use the bot ID format that matches the appId
+          id: `28:${teamsFixtures.appId}`,
+          name: teamsFixtures.botName,
+        },
+        text: "Bot's own message",
+      };
+
+      // First subscribe via mention
+      await chat.webhooks.teams(createTeamsRequest(teamsFixtures.mention), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Track if handler was called
+      let botMessageHandlerCalled = false;
+      chat.onSubscribedMessage(async () => {
+        botMessageHandlerCalled = true;
+      });
+
+      // Send bot's own message - should be skipped
+      await chat.webhooks.teams(createTeamsRequest(botMessage), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Handler should NOT be called for bot's own messages
+      expect(botMessageHandlerCalled).toBe(false);
     });
   });
 });

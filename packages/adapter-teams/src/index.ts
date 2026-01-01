@@ -29,6 +29,7 @@ import type {
   ThreadInfo,
   WebhookOptions,
 } from "chat-sdk";
+import { NotImplementedError } from "chat-sdk";
 import { TeamsFormatConverter } from "./markdown";
 
 export interface TeamsAdapterConfig {
@@ -171,10 +172,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     // Normalize mentions - format converter will convert <at>name</at> to @name
     const normalizedText = this.normalizeMentions(text, activity);
 
-    // Check if this message is from our bot
-    // In Teams, the bot's from.id contains the app ID
-    const fromId = activity.from?.id || "";
-    const isMe = fromId.includes(this.config.appId);
+    const isMe = this.isMessageFromSelf(activity);
 
     return {
       id: activity.id || "",
@@ -183,7 +181,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       formatted: this.formatConverter.toAst(normalizedText),
       raw: activity,
       author: {
-        userId: fromId || "unknown",
+        userId: activity.from?.id || "unknown",
         userName: activity.from?.name || "unknown",
         fullName: activity.from?.name || "unknown",
         isBot: activity.from?.role === "bot",
@@ -307,8 +305,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     _messageId: string,
     _emoji: string,
   ): Promise<void> {
-    // Teams reactions require different API approach
-    this.logger?.warn("Reactions not yet implemented");
+    throw new NotImplementedError(
+      "Teams Bot Framework does not expose reaction APIs",
+      "addReaction",
+    );
   }
 
   async removeReaction(
@@ -316,7 +316,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     _messageId: string,
     _emoji: string,
   ): Promise<void> {
-    this.logger?.warn("Reactions not yet implemented");
+    throw new NotImplementedError(
+      "Teams Bot Framework does not expose reaction APIs",
+      "removeReaction",
+    );
   }
 
   async startTyping(threadId: string): Promise<void> {
@@ -341,10 +344,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     _threadId: string,
     _options: FetchOptions = {},
   ): Promise<Message<unknown>[]> {
-    // Teams doesn't have a direct API to fetch message history
-    // This would require Graph API integration
-    this.logger?.warn("fetchMessages not yet implemented");
-    return [];
+    throw new NotImplementedError(
+      "Teams does not provide a bot API to fetch message history. Use Microsoft Graph API instead.",
+      "fetchMessages",
+    );
   }
 
   async fetchThread(threadId: string): Promise<ThreadInfo> {
@@ -390,6 +393,36 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       serviceUrl: activity.serviceUrl || "",
     });
     return this.parseTeamsMessage(activity, threadId);
+  }
+
+  /**
+   * Check if a Teams activity is from this bot.
+   *
+   * Teams bot IDs can appear in different formats:
+   * - Just the app ID: "abc123-def456-..."
+   * - With prefix: "28:abc123-def456-..."
+   *
+   * We check both exact match and suffix match (after colon delimiter)
+   * to handle all formats safely.
+   */
+  private isMessageFromSelf(activity: Activity): boolean {
+    const fromId = activity.from?.id;
+    if (!fromId || !this.config.appId) {
+      return false;
+    }
+
+    // Exact match (bot ID is just the app ID)
+    if (fromId === this.config.appId) {
+      return true;
+    }
+
+    // Teams format: "28:{appId}" or similar prefix patterns
+    // Check if it ends with our appId after a colon delimiter
+    if (fromId.endsWith(`:${this.config.appId}`)) {
+      return true;
+    }
+
+    return false;
   }
 
   renderFormatted(content: FormattedContent): string {

@@ -300,14 +300,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     event: SlackEvent,
     threadId: string,
   ): Promise<Message<unknown>> {
-    // Check if this message is from our bot
-    // Bot messages have bot_id (B_xxx), user messages have user (U_xxx)
-    // We need to check both since _botUserId is U_xxx and _botId is B_xxx
-    const isMe = !!(
-      (this._botUserId && event.user === this._botUserId) ||
-      (this._botId && event.bot_id === this._botId) ||
-      (this._botUserId && event.bot_id === this._botUserId)
-    );
+    const isMe = this.isMessageFromSelf(event);
 
     const text = event.text || "";
 
@@ -535,13 +528,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     event: SlackEvent,
     threadId: string,
   ): Message<unknown> {
-    // Check if this message is from our bot
-    // Bot messages have bot_id (B_xxx), user messages have user (U_xxx)
-    const isMe = !!(
-      (this._botUserId && event.user === this._botUserId) ||
-      (this._botId && event.bot_id === this._botId) ||
-      (this._botUserId && event.bot_id === this._botUserId)
-    );
+    const isMe = this.isMessageFromSelf(event);
 
     const text = event.text || "";
     // Without async lookup, fall back to user ID for human users
@@ -581,6 +568,31 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
 
   renderFormatted(content: FormattedContent): string {
     return this.formatConverter.fromAst(content);
+  }
+
+  /**
+   * Check if a Slack event is from this bot.
+   *
+   * Slack messages can come from:
+   * - User messages: have `user` field (U_xxx format)
+   * - Bot messages: have `bot_id` field (B_xxx format)
+   *
+   * We check both because:
+   * - _botUserId is the user ID (U_xxx) - matches event.user
+   * - _botId is the bot ID (B_xxx) - matches event.bot_id
+   */
+  private isMessageFromSelf(event: SlackEvent): boolean {
+    // Primary check: user ID match (for messages sent as the bot user)
+    if (this._botUserId && event.user === this._botUserId) {
+      return true;
+    }
+
+    // Secondary check: bot ID match (for bot_message subtypes)
+    if (this._botId && event.bot_id === this._botId) {
+      return true;
+    }
+
+    return false;
   }
 
   private handleSlackError(error: unknown): never {

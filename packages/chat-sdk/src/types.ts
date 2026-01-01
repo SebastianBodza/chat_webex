@@ -518,3 +518,14 @@ export class LockError extends ChatError {
     this.name = "LockError";
   }
 }
+
+export class NotImplementedError extends ChatError {
+  constructor(
+    message: string,
+    public readonly feature?: string,
+    cause?: unknown,
+  ) {
+    super(message, "NOT_IMPLEMENTED", cause);
+    this.name = "NotImplementedError";
+  }
+}

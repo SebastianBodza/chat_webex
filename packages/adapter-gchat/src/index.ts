@@ -860,11 +860,34 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   async removeReaction(
     _threadId: string,
-    _messageId: string,
-    _emoji: string,
+    messageId: string,
+    emoji: string,
   ): Promise<void> {
-    // Google Chat requires the reaction name to delete it
-    this.logger?.warn("removeReaction requires reaction name, not implemented");
+    try {
+      // Google Chat requires the reaction resource name to delete it.
+      // We need to list reactions and find the one with matching emoji.
+      const response = await this.chatApi.spaces.messages.reactions.list({
+        parent: messageId,
+      });
+
+      const reaction = response.data.reactions?.find(
+        (r) => r.emoji?.unicode === emoji,
+      );
+
+      if (!reaction?.name) {
+        this.logger?.debug("Reaction not found to remove", {
+          messageId,
+          emoji,
+        });
+        return;
+      }
+
+      await this.chatApi.spaces.messages.reactions.delete({
+        name: reaction.name,
+      });
+    } catch (error) {
+      this.handleGoogleChatError(error);
+    }
   }
 
   async startTyping(_threadId: string): Promise<void> {
@@ -1039,19 +1062,34 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   /**
    * Check if a message is from this bot.
+   *
+   * Bot user ID is learned dynamically from message annotations when the bot
+   * is @mentioned. Until we learn the ID, we cannot reliably determine isMe.
+   *
+   * This is safer than the previous approach of assuming all BOT messages are
+   * from self, which would incorrectly filter messages from other bots in
+   * multi-bot spaces (especially via Pub/Sub).
    */
   private isMessageFromSelf(message: GoogleChatMessage): boolean {
-    const senderType = message.sender?.type;
     const senderId = message.sender?.name;
 
-    // If we know our bot's user ID, use it for precise matching
+    // Use exact match when we know our bot ID
     if (this.botUserId && senderId) {
       return senderId === this.botUserId;
     }
 
-    // Fallback: assume all BOT messages are from us
-    // (This is safe for direct webhooks but may miss other bots in Pub/Sub)
-    return senderType === "BOT";
+    // If we don't know our bot ID yet, we can't reliably determine isMe.
+    // Log a debug message and return false - better to process a self-message
+    // than to incorrectly filter out messages from other bots.
+    if (!this.botUserId && message.sender?.type === "BOT") {
+      this.logger?.debug(
+        "Cannot determine isMe - bot user ID not yet learned. " +
+          "Bot ID is learned from @mentions. Assuming message is not from self.",
+        { senderId },
+      );
+    }
+
+    return false;
   }
 
   private handleGoogleChatError(error: unknown): never {
