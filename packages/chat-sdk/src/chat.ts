@@ -340,9 +340,16 @@ export class Chat<
     }
 
     // Run matching handlers
+    this.logger.debug("Checking reaction handlers", {
+      handlerCount: this.reactionHandlers.length,
+      emoji: event.emoji.name,
+      rawEmoji: event.rawEmoji,
+    });
+
     for (const { emoji: emojiFilter, handler } of this.reactionHandlers) {
       // If no emoji filter, run handler for all reactions
       if (emojiFilter.length === 0) {
+        this.logger.debug("Running catch-all reaction handler");
         await handler(event);
         continue;
       }
@@ -357,7 +364,16 @@ export class Chat<
         return filterName === event.emoji.name || filterName === event.rawEmoji;
       });
 
+      this.logger.debug("Reaction filter check", {
+        filterEmoji: emojiFilter.map((e) =>
+          typeof e === "string" ? e : e.name,
+        ),
+        eventEmoji: event.emoji.name,
+        matches,
+      });
+
       if (matches) {
+        this.logger.debug("Running matched reaction handler");
         await handler(event);
       }
     }

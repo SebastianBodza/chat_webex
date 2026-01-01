@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chat } from "./chat";
+import { getEmoji } from "./emoji";
 import { parseMarkdown } from "./markdown";
 import type {
   Adapter,
@@ -232,7 +233,7 @@ describe("Chat", () => {
       chat.onReaction(handler);
 
       const event: ReactionEvent = {
-        emoji: "thumbs_up",
+        emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
         user: {
@@ -260,7 +261,7 @@ describe("Chat", () => {
       chat.onReaction(["thumbs_up", "heart"], handler);
 
       const thumbsUpEvent: ReactionEvent = {
-        emoji: "thumbs_up",
+        emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
         user: {
@@ -277,7 +278,7 @@ describe("Chat", () => {
       };
 
       const fireEvent: ReactionEvent = {
-        emoji: "fire",
+        emoji: getEmoji("fire"),
         rawEmoji: "fire",
         added: true,
         user: {
@@ -306,7 +307,7 @@ describe("Chat", () => {
       chat.onReaction(handler);
 
       const event: ReactionEvent = {
-        emoji: "thumbs_up",
+        emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
         user: {
@@ -334,7 +335,7 @@ describe("Chat", () => {
       chat.onReaction(["+1"], handler);
 
       const event: ReactionEvent = {
-        emoji: "thumbs_up",
+        emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
         user: {
@@ -361,7 +362,7 @@ describe("Chat", () => {
       chat.onReaction(handler);
 
       const event: ReactionEvent = {
-        emoji: "thumbs_up",
+        emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: false,
         user: {
@@ -382,6 +383,65 @@ describe("Chat", () => {
 
       expect(handler).toHaveBeenCalledWith(event);
       expect(handler.mock.calls[0][0].added).toBe(false);
+    });
+
+    it("should match Teams-style reactions (EmojiValue with string filter)", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      // Register with string filter (as done in bot.ts)
+      chat.onReaction(["thumbs_up", "heart", "fire", "rocket"], handler);
+
+      // Teams sends rawEmoji: "like" which gets normalized to EmojiValue with name: "thumbs_up"
+      const teamsEvent: ReactionEvent = {
+        emoji: getEmoji("thumbs_up"), // Normalized by fromTeams()
+        rawEmoji: "like", // Teams format
+        added: true,
+        user: {
+          userId: "29:abc123",
+          userName: "unknown",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "1767297849909",
+        threadId: "teams:abc:def",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(teamsEvent);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(teamsEvent);
+    });
+
+    it("should match EmojiValue by object identity", async () => {
+      const thumbsUp = getEmoji("thumbs_up");
+      const handler = vi.fn().mockResolvedValue(undefined);
+      // Register with EmojiValue object
+      chat.onReaction([thumbsUp], handler);
+
+      const event: ReactionEvent = {
+        emoji: thumbsUp, // Same EmojiValue singleton
+        rawEmoji: "like",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalledWith(event);
     });
   });
 });
