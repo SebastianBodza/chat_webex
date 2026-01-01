@@ -60,9 +60,9 @@ bot.onReaction(["thumbs_up", "heart", "fire", "rocket"], async (event) => {
   // Only respond to added reactions, not removed ones
   if (!event.added) return;
 
-  // GChat bots cannot add reactions via service account auth (API limitation)
+  // GChat and Teams bots cannot add reactions via their APIs
   // Respond with a message instead
-  if (event.adapter.name === "gchat") {
+  if (event.adapter.name === "gchat" || event.adapter.name === "teams") {
     await event.adapter.postMessage(
       event.threadId,
       `Thanks for the ${event.rawEmoji}!`,
