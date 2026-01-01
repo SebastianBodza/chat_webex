@@ -212,6 +212,54 @@ describe("Replay Tests", () => {
         expect.objectContaining({ text: "Thanks for your message" }),
       );
     });
+
+    it("should correctly identify bot messages as isMe", async () => {
+      // First subscribe via mention
+      await chat.webhooks.gchat(createGchatRequest(gchatFixtures.mention), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Track if handler was called
+      let botMessageHandlerCalled = false;
+      chat.onSubscribedMessage(async () => {
+        botMessageHandlerCalled = true;
+      });
+
+      // Create a Pub/Sub message from the bot itself
+      const botFollowUp = {
+        message: {
+          attributes: { "ce-type": "google.workspace.chat.message.v1.created" },
+          // Base64 encoded message with sender matching the bot's user ID
+          data: Buffer.from(
+            JSON.stringify({
+              message: {
+                name: "spaces/AAQAJ9CXYcg/messages/bot-msg-001",
+                sender: {
+                  name: gchatFixtures.botUserId, // Bot's own user ID
+                  type: "BOT",
+                },
+                text: "Bot's own message",
+                thread: { name: "spaces/AAQAJ9CXYcg/threads/kVOtO797ZPI" },
+                space: { name: "spaces/AAQAJ9CXYcg" },
+                threadReply: true,
+              },
+            }),
+          ).toString("base64"),
+        },
+        subscription:
+          "projects/chat-sdk-demo-482018/subscriptions/chat-messages-push",
+      };
+
+      // Send bot's own message - should be skipped
+      await chat.webhooks.gchat(createGchatRequest(botFollowUp), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Handler should NOT be called for bot's own messages
+      expect(botMessageHandlerCalled).toBe(false);
+    });
   });
 
   describe("Slack", () => {
