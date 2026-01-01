@@ -9,10 +9,11 @@ import type {
   Message,
   PostableMessage,
   RawMessage,
+  ReactionEvent,
   ThreadInfo,
   WebhookOptions,
 } from "chat-sdk";
-import { RateLimitError } from "chat-sdk";
+import { defaultEmojiResolver, RateLimitError } from "chat-sdk";
 import { SlackFormatConverter } from "./markdown";
 
 export interface SlackAdapterConfig {
@@ -51,10 +52,25 @@ export interface SlackEvent {
   }>;
 }
 
-interface SlackEventPayload {
+/** Slack reaction event payload */
+export interface SlackReactionEvent {
+  type: "reaction_added" | "reaction_removed";
+  user: string;
+  reaction: string;
+  item_user?: string;
+  item: {
+    type: string;
+    channel: string;
+    ts: string;
+  };
+  event_ts: string;
+}
+
+/** Slack webhook payload envelope */
+interface SlackWebhookPayload {
   type: string;
   challenge?: string;
-  event?: SlackEvent;
+  event?: SlackEvent | SlackReactionEvent;
   event_id?: string;
   event_time?: number;
 }
@@ -188,7 +204,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     }
 
     // Parse the payload
-    let payload: SlackEventPayload;
+    let payload: SlackWebhookPayload;
     try {
       payload = JSON.parse(body);
     } catch {
@@ -209,7 +225,12 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
 
       // Process event asynchronously
       if (event.type === "message" || event.type === "app_mention") {
-        this.handleMessageEvent(event, options);
+        this.handleMessageEvent(event as SlackEvent, options);
+      } else if (
+        event.type === "reaction_added" ||
+        event.type === "reaction_removed"
+      ) {
+        this.handleReactionEvent(event as SlackReactionEvent, options);
       }
     }
 
@@ -294,6 +315,65 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       () => this.parseSlackMessage(event, threadId),
       options,
     );
+  }
+
+  /**
+   * Handle reaction events from Slack (reaction_added, reaction_removed).
+   */
+  private handleReactionEvent(
+    event: SlackReactionEvent,
+    options?: WebhookOptions,
+  ): void {
+    if (!this.chat) {
+      this.logger?.warn("Chat instance not initialized, ignoring reaction");
+      return;
+    }
+
+    // Only handle reactions to messages (not files, etc.)
+    if (event.item.type !== "message") {
+      this.logger?.debug("Ignoring reaction to non-message item", {
+        itemType: event.item.type,
+      });
+      return;
+    }
+
+    // Build thread ID from the reacted message
+    const threadId = this.encodeThreadId({
+      channel: event.item.channel,
+      threadTs: event.item.ts,
+    });
+
+    // Build message ID (Slack uses ts as message ID within a channel)
+    const messageId = `${event.item.channel}:${event.item.ts}`;
+
+    // Normalize emoji
+    const rawEmoji = event.reaction;
+    const normalizedEmoji = defaultEmojiResolver.fromSlack(rawEmoji);
+
+    // Check if reaction is from this bot
+    const isMe =
+      (this._botUserId !== null && event.user === this._botUserId) ||
+      (this._botId !== null && event.user === this._botId);
+
+    // Build reaction event
+    const reactionEvent: Omit<ReactionEvent, "adapter"> = {
+      emoji: normalizedEmoji,
+      rawEmoji,
+      added: event.type === "reaction_added",
+      user: {
+        userId: event.user,
+        userName: event.user, // Will be resolved below if possible
+        fullName: event.user,
+        isBot: false, // Users add reactions, not bots typically
+        isMe,
+      },
+      messageId,
+      threadId,
+      raw: event,
+    };
+
+    // Process reaction
+    this.chat.processReaction({ ...reactionEvent, adapter: this }, options);
   }
 
   private async parseSlackMessage(

@@ -3,11 +3,14 @@ import type {
   Adapter,
   ChatConfig,
   ChatInstance,
+  Emoji,
   Logger,
   LogLevel,
   MentionHandler,
   Message,
   MessageHandler,
+  ReactionEvent,
+  ReactionHandler,
   StateAdapter,
   SubscribedMessageHandler,
   Thread,
@@ -22,6 +25,12 @@ const DEDUPE_TTL_MS = 60_000; // 60 seconds
 interface MessagePattern {
   pattern: RegExp;
   handler: MessageHandler;
+}
+
+interface ReactionPattern {
+  /** If specified, only these emoji trigger the handler. Empty means all emoji. */
+  emoji: (Emoji | string)[];
+  handler: ReactionHandler;
 }
 
 /**
@@ -67,6 +76,7 @@ export class Chat<
   private mentionHandlers: MentionHandler[] = [];
   private messagePatterns: MessagePattern[] = [];
   private subscribedMessageHandlers: SubscribedMessageHandler[] = [];
+  private reactionHandlers: ReactionPattern[] = [];
 
   /** Initialization state */
   private initPromise: Promise<void> | null = null;
@@ -207,6 +217,44 @@ export class Chat<
   }
 
   /**
+   * Register a handler for reaction events.
+   *
+   * @example
+   * ```typescript
+   * // Handle specific emoji
+   * chat.onReaction(["thumbs_up", "heart"], async (event) => {
+   *   console.log(`${event.user.userName} reacted with ${event.emoji}`);
+   * });
+   *
+   * // Handle all reactions
+   * chat.onReaction(async (event) => {
+   *   console.log(`${event.added ? "Added" : "Removed"} ${event.emoji}`);
+   * });
+   * ```
+   *
+   * @param emojiOrHandler - Either an array of emoji to filter, or the handler
+   * @param handler - The handler (if emoji filter is provided)
+   */
+  onReaction(handler: ReactionHandler): void;
+  onReaction(emoji: (Emoji | string)[], handler: ReactionHandler): void;
+  onReaction(
+    emojiOrHandler: (Emoji | string)[] | ReactionHandler,
+    handler?: ReactionHandler,
+  ): void {
+    if (typeof emojiOrHandler === "function") {
+      // No emoji filter - handle all reactions
+      this.reactionHandlers.push({ emoji: [], handler: emojiOrHandler });
+      this.logger.debug("Registered reaction handler for all emoji");
+    } else if (handler) {
+      // Specific emoji filter
+      this.reactionHandlers.push({ emoji: emojiOrHandler, handler });
+      this.logger.debug("Registered reaction handler", {
+        emoji: emojiOrHandler,
+      });
+    }
+  }
+
+  /**
    * Get an adapter by name with type safety.
    */
   getAdapter<K extends keyof TAdapters>(name: K): TAdapters[K] {
@@ -238,6 +286,69 @@ export class Chat<
 
     if (options?.waitUntil) {
       options.waitUntil(task);
+    }
+  }
+
+  /**
+   * Process an incoming reaction event from an adapter.
+   * Handles waitUntil registration and error catching internally.
+   */
+  processReaction(
+    event: Omit<ReactionEvent, "adapter"> & { adapter?: Adapter },
+    options?: WebhookOptions,
+  ): void {
+    const task = this.handleReactionEvent(event as ReactionEvent).catch(
+      (err) => {
+        this.logger.error("Reaction processing error", {
+          error: err,
+          emoji: event.emoji,
+          messageId: event.messageId,
+        });
+      },
+    );
+
+    if (options?.waitUntil) {
+      options.waitUntil(task);
+    }
+  }
+
+  /**
+   * Handle a reaction event internally.
+   */
+  private async handleReactionEvent(event: ReactionEvent): Promise<void> {
+    this.logger.debug("Incoming reaction", {
+      adapter: event.adapter?.name,
+      emoji: event.emoji,
+      rawEmoji: event.rawEmoji,
+      added: event.added,
+      user: event.user.userName,
+      messageId: event.messageId,
+      threadId: event.threadId,
+    });
+
+    // Skip reactions from self
+    if (event.user.isMe) {
+      this.logger.debug("Skipping reaction from self", {
+        emoji: event.emoji,
+      });
+      return;
+    }
+
+    // Run matching handlers
+    for (const { emoji, handler } of this.reactionHandlers) {
+      // If no emoji filter, run handler for all reactions
+      if (emoji.length === 0) {
+        await handler(event);
+        continue;
+      }
+
+      // Check if the reaction matches any of the specified emoji
+      const matches = emoji.some(
+        (e) => e === event.emoji || e === event.rawEmoji,
+      );
+      if (matches) {
+        await handler(event);
+      }
     }
   }
 

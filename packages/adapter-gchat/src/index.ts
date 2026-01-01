@@ -7,11 +7,12 @@ import type {
   Message,
   PostableMessage,
   RawMessage,
+  ReactionEvent,
   StateAdapter,
   ThreadInfo,
   WebhookOptions,
 } from "chat-sdk";
-import { RateLimitError } from "chat-sdk";
+import { defaultEmojiResolver, RateLimitError } from "chat-sdk";
 import { type chat_v1, google } from "googleapis";
 import { GoogleChatFormatConverter } from "./markdown";
 import {
@@ -558,8 +559,13 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     // Early filter: Check event type BEFORE base64 decoding to save CPU
     // The ce-type attribute is available in message.attributes
     const eventType = pushMessage.message?.attributes?.["ce-type"];
-    if (eventType && eventType !== "google.workspace.chat.message.v1.created") {
-      this.logger?.debug("Skipping non-created Pub/Sub event", { eventType });
+    const allowedEventTypes = [
+      "google.workspace.chat.message.v1.created",
+      "google.workspace.chat.reaction.v1.created",
+      "google.workspace.chat.reaction.v1.deleted",
+    ];
+    if (eventType && !allowedEventTypes.includes(eventType)) {
+      this.logger?.debug("Skipping unsupported Pub/Sub event", { eventType });
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json" },
       });
@@ -570,11 +576,17 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       this.logger?.debug("Pub/Sub notification decoded", {
         eventType: notification.eventType,
         messageId: notification.message?.name,
+        reactionName: notification.reaction?.name,
       });
 
       // Handle message.created events
       if (notification.message) {
         this.handlePubSubMessageEvent(notification, options);
+      }
+
+      // Handle reaction events
+      if (notification.reaction) {
+        this.handlePubSubReactionEvent(notification, options);
       }
 
       // Acknowledge the message
@@ -631,6 +643,69 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       this.parsePubSubMessage(notification, threadId),
       options,
     );
+  }
+
+  /**
+   * Handle reaction events received via Pub/Sub (Workspace Events).
+   */
+  private handlePubSubReactionEvent(
+    notification: WorkspaceEventNotification,
+    options?: WebhookOptions,
+  ): void {
+    if (!this.chat || !notification.reaction) {
+      return;
+    }
+
+    const reaction = notification.reaction;
+    const rawEmoji = reaction.emoji?.unicode || "";
+    const normalizedEmoji = defaultEmojiResolver.fromGChat(rawEmoji);
+
+    // Extract message name from reaction name
+    // Format: spaces/{space}/messages/{message}/reactions/{reaction}
+    const reactionName = reaction.name || "";
+    const messageNameMatch = reactionName.match(
+      /(spaces\/[^/]+\/messages\/[^/]+)/,
+    );
+    const messageName = messageNameMatch ? messageNameMatch[1] : "";
+
+    // Extract space name from targetResource
+    const spaceName = notification.targetResource?.replace(
+      "//chat.googleapis.com/",
+      "",
+    );
+
+    // Build thread ID - use message name as thread since we don't have thread info
+    const threadId = this.encodeThreadId({
+      spaceName: spaceName || "",
+      threadName: messageName,
+    });
+
+    // Check if reaction is from this bot
+    const isMe =
+      this.botUserId !== undefined && reaction.user?.name === this.botUserId;
+
+    // Determine if this is an add or remove
+    const added = notification.eventType.includes("created");
+
+    // Build reaction event
+    const reactionEvent: Omit<ReactionEvent, "adapter"> = {
+      emoji: normalizedEmoji,
+      rawEmoji,
+      added,
+      user: {
+        userId: reaction.user?.name || "unknown",
+        userName: reaction.user?.displayName || "unknown",
+        fullName: reaction.user?.displayName || "unknown",
+        isBot: reaction.user?.type === "BOT",
+        isMe,
+      },
+      messageId: messageName,
+      threadId,
+      raw: notification,
+    };
+
+    // Process reaction
+    this.chat.processReaction({ ...reactionEvent, adapter: this }, options);
   }
 
   /**

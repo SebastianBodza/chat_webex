@@ -11,6 +11,7 @@ This document outlines the capabilities and limitations of each chat platform ad
 | `deleteMessage` | ✅ | ✅ | ✅ |
 | `addReaction` | ✅ | ❌ | ✅ |
 | `removeReaction` | ✅ | ❌ | ✅ |
+| `onReaction` events | ✅ | ❌ | ✅* |
 | `startTyping` | ❌ | ✅ | ❌ |
 | `fetchMessages` | ✅ | ❌ | ✅ |
 | `fetchThread` | ✅ | ✅ | ✅ |
@@ -78,6 +79,77 @@ All adapters throw errors on API failures. Specific error types:
 
 - `RateLimitError`: Thrown when platform rate limits are exceeded (429 responses)
 - `NotImplementedError`: Thrown when calling unsupported features
+
+## Reaction Events
+
+The SDK provides `onReaction()` to handle emoji reaction events. Support varies by platform:
+
+### Platform Support
+
+| Platform | Supported | Notes |
+|----------|:---------:|-------|
+| Slack | ✅ | Via `reaction_added` and `reaction_removed` events |
+| Teams | ❌ | Bot Framework does not expose reaction events |
+| Google Chat | ✅* | Requires Workspace Events API (Pub/Sub subscription) |
+
+*Google Chat reaction events are only delivered via Pub/Sub (Workspace Events API), not direct HTTP webhooks.
+
+### Emoji Normalization
+
+Platforms use different formats for emoji:
+- **Slack**: Names like `+1`, `thumbsup`, `fire`
+- **Google Chat**: Unicode like `👍`, `🔥`
+
+The SDK normalizes these to a common format using `WellKnownEmoji`:
+
+| Normalized | Slack | Google Chat |
+|------------|-------|-------------|
+| `thumbs_up` | `+1`, `thumbsup` | `👍` |
+| `thumbs_down` | `-1`, `thumbsdown` | `👎` |
+| `heart` | `heart` | `❤️`, `❤` |
+| `fire` | `fire` | `🔥` |
+| `check` | `white_check_mark`, `heavy_check_mark` | `✅`, `✔️` |
+| `rocket` | `rocket` | `🚀` |
+| ... | (18 total well-known emoji) | |
+
+### Extending Emoji Types
+
+You can extend the emoji type system using TypeScript module augmentation:
+
+```typescript
+// Extend the emoji type system
+declare module "chat-sdk" {
+  interface CustomEmojiMap {
+    unicorn: true;
+    custom_team_emoji: true;
+  }
+}
+
+// Use with type safety
+chat.onReaction(["unicorn"], async (event) => {
+  // event.emoji is now typed to include "unicorn"
+});
+
+// Register the emoji mapping for cross-platform support
+import { defaultEmojiResolver } from "chat-sdk";
+
+defaultEmojiResolver.extend({
+  unicorn: { slack: "unicorn_face", gchat: "🦄" },
+});
+```
+
+### ReactionEvent Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `emoji` | `Emoji \| string` | Normalized emoji name (e.g., `thumbs_up`) |
+| `rawEmoji` | `string` | Platform-specific emoji (e.g., `+1` or `👍`) |
+| `added` | `boolean` | `true` if reaction was added, `false` if removed |
+| `user` | `Author` | The user who added/removed the reaction |
+| `messageId` | `string` | ID of the message that was reacted to |
+| `threadId` | `string` | Thread ID for the message |
+| `adapter` | `Adapter` | The adapter that received the event |
+| `raw` | `unknown` | Raw platform event data |
 
 ## Markdown Support
 

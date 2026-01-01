@@ -6,6 +6,7 @@ import type {
   FormattedContent,
   Lock,
   Message,
+  ReactionEvent,
   StateAdapter,
 } from "./types";
 
@@ -223,5 +224,164 @@ describe("Chat", () => {
     );
 
     expect(helpHandler).toHaveBeenCalled();
+  });
+
+  describe("Reactions", () => {
+    it("should call onReaction handler for all reactions", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onReaction(handler);
+
+      const event: ReactionEvent = {
+        emoji: "thumbs_up",
+        rawEmoji: "+1",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      // Wait for async processing
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalledWith(event);
+    });
+
+    it("should call onReaction handler for specific emoji", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onReaction(["thumbs_up", "heart"], handler);
+
+      const thumbsUpEvent: ReactionEvent = {
+        emoji: "thumbs_up",
+        rawEmoji: "+1",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      const fireEvent: ReactionEvent = {
+        emoji: "fire",
+        rawEmoji: "fire",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(thumbsUpEvent);
+      chat.processReaction(fireEvent);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(thumbsUpEvent);
+    });
+
+    it("should skip reactions from self", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onReaction(handler);
+
+      const event: ReactionEvent = {
+        emoji: "thumbs_up",
+        rawEmoji: "+1",
+        added: true,
+        user: {
+          userId: "BOT",
+          userName: "testbot",
+          fullName: "Test Bot",
+          isBot: true,
+          isMe: true,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("should match by rawEmoji when specified in filter", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      // Filter by raw emoji format
+      chat.onReaction(["+1"], handler);
+
+      const event: ReactionEvent = {
+        emoji: "thumbs_up",
+        rawEmoji: "+1",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalledWith(event);
+    });
+
+    it("should handle removed reactions", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onReaction(handler);
+
+      const event: ReactionEvent = {
+        emoji: "thumbs_up",
+        rawEmoji: "+1",
+        added: false,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalledWith(event);
+      expect(handler.mock.calls[0][0].added).toBe(false);
+    });
   });
 });

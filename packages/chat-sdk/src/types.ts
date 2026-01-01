@@ -223,6 +223,18 @@ export interface ChatInstance {
     message: Message,
   ): Promise<void>;
 
+  /**
+   * Process an incoming reaction event from an adapter.
+   * Handles waitUntil registration and error catching internally.
+   *
+   * @param event - The reaction event (without adapter field, will be added)
+   * @param options - Webhook options including waitUntil
+   */
+  processReaction(
+    event: Omit<ReactionEvent, "adapter"> & { adapter?: Adapter },
+    options?: WebhookOptions,
+  ): void;
+
   getState(): StateAdapter;
   getUserName(): string;
   /** Get the configured logger, optionally with a child prefix */
@@ -485,6 +497,117 @@ export type SubscribedMessageHandler = (
   thread: Thread,
   message: Message,
 ) => Promise<void>;
+
+// =============================================================================
+// Reactions / Emoji
+// =============================================================================
+
+/**
+ * Well-known emoji that work across platforms (Slack and Google Chat).
+ * These are normalized to a common format regardless of platform.
+ */
+export type WellKnownEmoji =
+  | "thumbs_up"
+  | "thumbs_down"
+  | "heart"
+  | "smile"
+  | "laugh"
+  | "thinking"
+  | "eyes"
+  | "fire"
+  | "check"
+  | "x"
+  | "question"
+  | "party"
+  | "rocket"
+  | "star"
+  | "wave"
+  | "clap"
+  | "100"
+  | "warning";
+
+/**
+ * Platform-specific emoji formats for a single emoji.
+ */
+export interface EmojiFormats {
+  /** Slack emoji name (without colons), e.g., "+1", "heart" */
+  slack: string | string[];
+  /** Google Chat unicode emoji, e.g., "👍", "❤️" */
+  gchat: string | string[];
+}
+
+/**
+ * Emoji map type - can be extended by users to add custom emoji.
+ *
+ * @example
+ * ```typescript
+ * // Extend with custom emoji
+ * declare module "chat-sdk" {
+ *   interface CustomEmojiMap {
+ *     "custom_emoji": EmojiFormats;
+ *   }
+ * }
+ *
+ * const myEmojiMap: EmojiMapConfig = {
+ *   custom_emoji: { slack: "custom", gchat: "🎯" },
+ * };
+ * ```
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: Required for TypeScript module augmentation
+// biome-ignore lint/complexity/noBannedTypes: Required for TypeScript module augmentation
+export interface CustomEmojiMap {}
+
+/**
+ * Full emoji type including well-known and custom emoji.
+ */
+export type Emoji = WellKnownEmoji | keyof CustomEmojiMap;
+
+/**
+ * Configuration for emoji mapping.
+ */
+export type EmojiMapConfig = Partial<Record<Emoji, EmojiFormats>>;
+
+/**
+ * Reaction event fired when a user adds or removes a reaction.
+ */
+export interface ReactionEvent<TRawMessage = unknown> {
+  /** The normalized emoji identifier */
+  emoji: Emoji | string;
+  /** The raw platform-specific emoji (e.g., "+1" for Slack, "👍" for GChat) */
+  rawEmoji: string;
+  /** Whether the reaction was added (true) or removed (false) */
+  added: boolean;
+  /** The user who added/removed the reaction */
+  user: Author;
+  /** The message that was reacted to (if available) */
+  message?: Message<TRawMessage>;
+  /** The message ID that was reacted to */
+  messageId: string;
+  /** The thread ID */
+  threadId: string;
+  /** The adapter that received the event */
+  adapter: Adapter;
+  /** Platform-specific raw event data */
+  raw: unknown;
+}
+
+/**
+ * Handler for reaction events.
+ *
+ * @example
+ * ```typescript
+ * // Handle specific emoji
+ * chat.onReaction(["thumbs_up", "heart"], async (event) => {
+ *   console.log(`${event.user.userName} ${event.added ? "added" : "removed"} ${event.emoji}`);
+ * });
+ *
+ * // Handle all reactions
+ * chat.onReaction(async (event) => {
+ *   // ...
+ * });
+ * ```
+ */
+export type ReactionHandler = (event: ReactionEvent) => Promise<void>;
 
 // =============================================================================
 // Errors

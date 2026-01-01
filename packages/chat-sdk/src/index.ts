@@ -1,5 +1,11 @@
 // Main exports
 export { Chat } from "./chat";
+// Emoji utilities
+export {
+  DEFAULT_EMOJI_MAP,
+  defaultEmojiResolver,
+  EmojiResolver,
+} from "./emoji";
 // Re-export mdast types for adapters
 export type {
   Blockquote,
@@ -41,7 +47,6 @@ export {
   toPlainText,
   walkAst,
 } from "./markdown";
-
 // Types
 export type {
   Adapter,
@@ -49,6 +54,10 @@ export type {
   Author,
   ChatConfig,
   ChatInstance,
+  CustomEmojiMap,
+  Emoji,
+  EmojiFormats,
+  EmojiMapConfig,
   FetchOptions,
   FormattedContent,
   Lock,
@@ -63,14 +72,16 @@ export type {
   PostableMessage,
   PostableRaw,
   RawMessage,
+  ReactionEvent,
+  ReactionHandler,
   SentMessage,
   StateAdapter,
   SubscribedMessageHandler,
   Thread,
   ThreadInfo,
   WebhookOptions,
+  WellKnownEmoji,
 } from "./types";
-
 // Errors and Logger
 export {
   ChatError,

@@ -45,6 +45,22 @@ export interface PubSubPushMessage {
   subscription: string;
 }
 
+/** Google Chat reaction data */
+export interface GoogleChatReaction {
+  /** Reaction resource name */
+  name: string;
+  /** The user who added/removed the reaction */
+  user?: {
+    name: string;
+    displayName?: string;
+    type?: string;
+  };
+  /** The emoji */
+  emoji?: {
+    unicode?: string;
+  };
+}
+
 /** Decoded Workspace Events notification payload */
 export interface WorkspaceEventNotification {
   /** The subscription that triggered this event */
@@ -62,6 +78,8 @@ export interface WorkspaceEventNotification {
   };
   /** Present for message.created events */
   message?: GoogleChatMessage;
+  /** Present for reaction.created/deleted events */
+  reaction?: GoogleChatReaction;
 }
 
 /** Service account credentials for authentication */
@@ -143,6 +161,8 @@ export async function createSpaceSubscription(
       eventTypes: [
         "google.workspace.chat.message.v1.created",
         "google.workspace.chat.message.v1.updated",
+        "google.workspace.chat.reaction.v1.created",
+        "google.workspace.chat.reaction.v1.deleted",
       ],
       notificationEndpoint: {
         pubsubTopic,
@@ -278,7 +298,10 @@ export function decodePubSubMessage(
   const data = Buffer.from(pushMessage.message.data, "base64").toString(
     "utf-8",
   );
-  const payload = JSON.parse(data) as { message?: GoogleChatMessage };
+  const payload = JSON.parse(data) as {
+    message?: GoogleChatMessage;
+    reaction?: GoogleChatReaction;
+  };
 
   // Extract CloudEvents metadata from attributes
   const attributes = pushMessage.message.attributes || {};
@@ -289,6 +312,7 @@ export function decodePubSubMessage(
     eventType: attributes["ce-type"] || "",
     eventTime: attributes["ce-time"] || pushMessage.message.publishTime,
     message: payload.message,
+    reaction: payload.reaction,
   };
 }
 

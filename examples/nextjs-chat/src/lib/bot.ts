@@ -54,3 +54,12 @@ bot.onNewMessage(/help/i, async (thread, message) => {
       `• Active platforms: ${platforms}`,
   );
 });
+
+// Handle emoji reactions - respond with a matching emoji
+bot.onReaction(["thumbs_up", "heart", "fire", "rocket"], async (event) => {
+  // Only respond to added reactions, not removed ones
+  if (!event.added) return;
+
+  // React to the same message with the same emoji
+  await event.adapter.addReaction(event.threadId, event.messageId, event.emoji);
+});
