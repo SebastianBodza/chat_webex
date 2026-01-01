@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src"
+    "lint": "biome check src",
+    "recording:list": "tsx src/lib/recorder.ts --list",
+    "recording:export": "tsx src/lib/recorder.ts"
   },
   "dependencies": {
     "@chat-sdk/gchat": "workspace:*",
@@ -24,6 +26,8 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
+    "dotenv": "^17.2.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2"
   }
 }

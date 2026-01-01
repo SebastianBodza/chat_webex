@@ -29,3 +29,5 @@ out/
 
 tsup.config.bundled*.mjs
 *.tsbuildinfo
+recording.json
+recording*.json

@@ -227,6 +227,13 @@ export function withRecording<T extends object>(
 // CLI: Run this file directly to export recordings
 // pnpm --filter example-nextjs-chat exec tsx src/lib/recorder.ts [sessionId]
 async function main() {
+  // Load .env.local for CLI usage
+  try {
+    const { config } = await import("dotenv");
+    config({ path: ".env.local" });
+  } catch {
+    // dotenv not available, skip
+  }
   const sessionId = process.argv[2];
 
   if (!process.env.REDIS_URL) {
