@@ -16,7 +16,6 @@ import type {
 import {
   convertEmojiPlaceholders,
   defaultEmojiResolver,
-  getEmoji,
   RateLimitError,
 } from "chat-sdk";
 import { type chat_v1, google } from "googleapis";

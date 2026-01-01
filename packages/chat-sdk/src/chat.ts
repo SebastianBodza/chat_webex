@@ -254,9 +254,7 @@ export class Chat<
       // Specific emoji filter
       this.reactionHandlers.push({ emoji: emojiOrHandler, handler });
       this.logger.debug("Registered reaction handler", {
-        emoji: emojiOrHandler.map((e) =>
-          typeof e === "string" ? e : e.name,
-        ),
+        emoji: emojiOrHandler.map((e) => (typeof e === "string" ? e : e.name)),
       });
     }
   }

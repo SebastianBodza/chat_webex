@@ -17,7 +17,6 @@ import type {
 import {
   convertEmojiPlaceholders,
   defaultEmojiResolver,
-  getEmoji,
   RateLimitError,
 } from "chat-sdk";
 import { SlackFormatConverter } from "./markdown";
