@@ -48,10 +48,10 @@ bot.onSubscribedMessage(async (thread, _message) => {
 bot.onNewMessage(/help/i, async (thread, message) => {
   const platforms = Object.keys(adapters).join(", ") || "none configured";
   await thread.post(
-    `Hi ${message.author.userName}! Here's how I can help:\n\n` +
-      `• **Mention me** to start a conversation\n` +
-      `• I'll respond to messages in threads where I'm mentioned\n` +
-      `• Active platforms: ${platforms}`,
+    `${emoji.wave} Hi ${message.author.userName}! Here's how I can help:\n\n` +
+      `${emoji.star} **Mention me** to start a conversation\n` +
+      `${emoji.eyes} I'll respond to messages in threads where I'm mentioned\n` +
+      `${emoji.rocket} Active platforms: ${platforms}`,
   );
 });
 
