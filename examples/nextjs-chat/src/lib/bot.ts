@@ -61,5 +61,6 @@ bot.onReaction(["thumbs_up", "heart", "fire", "rocket"], async (event) => {
   if (!event.added) return;
 
   // React to the same message with the same emoji
+  // Adapters auto-convert normalized emoji to platform-specific format
   await event.adapter.addReaction(event.threadId, event.messageId, event.emoji);
 });

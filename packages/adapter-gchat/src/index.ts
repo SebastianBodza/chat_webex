@@ -217,13 +217,20 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
     let auth: Parameters<typeof google.chat>[0]["auth"];
 
+    // Scopes needed for full bot functionality including reactions
+    const scopes = [
+      "https://www.googleapis.com/auth/chat.bot",
+      "https://www.googleapis.com/auth/chat.messages.reactions.create",
+      "https://www.googleapis.com/auth/chat.messages.reactions",
+    ];
+
     if ("credentials" in config && config.credentials) {
       // Service account credentials (JWT)
       this.credentials = config.credentials;
       auth = new google.auth.JWT({
         email: config.credentials.client_email,
         key: config.credentials.private_key,
-        scopes: ["https://www.googleapis.com/auth/chat.bot"],
+        scopes,
       });
     } else if (
       "useApplicationDefaultCredentials" in config &&
@@ -233,7 +240,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       // Works with Workload Identity Federation, GCE metadata, GOOGLE_APPLICATION_CREDENTIALS env var
       this.useADC = true;
       auth = new google.auth.GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/chat.bot"],
+        scopes,
       });
     } else if ("auth" in config && config.auth) {
       // Custom auth client provided directly (e.g., Vercel OIDC)
@@ -921,11 +928,14 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     messageId: string,
     emoji: string,
   ): Promise<void> {
+    // Convert normalized emoji to GChat unicode format
+    const gchatEmoji = defaultEmojiResolver.toGChat(emoji);
+
     try {
       await this.chatApi.spaces.messages.reactions.create({
         parent: messageId,
         requestBody: {
-          emoji: { unicode: emoji },
+          emoji: { unicode: gchatEmoji },
         },
       });
     } catch (error) {
@@ -938,6 +948,9 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     messageId: string,
     emoji: string,
   ): Promise<void> {
+    // Convert normalized emoji to GChat unicode format
+    const gchatEmoji = defaultEmojiResolver.toGChat(emoji);
+
     try {
       // Google Chat requires the reaction resource name to delete it.
       // We need to list reactions and find the one with matching emoji.
@@ -946,7 +959,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       });
 
       const reaction = response.data.reactions?.find(
-        (r) => r.emoji?.unicode === emoji,
+        (r) => r.emoji?.unicode === gchatEmoji,
       );
 
       if (!reaction?.name) {

@@ -495,7 +495,9 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     emoji: string,
   ): Promise<void> {
     const { channel } = this.decodeThreadId(threadId);
-    const name = emoji.replace(/:/g, "");
+    // Convert normalized emoji to Slack format, strip colons
+    const slackEmoji = defaultEmojiResolver.toSlack(emoji);
+    const name = slackEmoji.replace(/:/g, "");
 
     try {
       await this.client.reactions.add({
@@ -514,7 +516,9 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     emoji: string,
   ): Promise<void> {
     const { channel } = this.decodeThreadId(threadId);
-    const name = emoji.replace(/:/g, "");
+    // Convert normalized emoji to Slack format, strip colons
+    const slackEmoji = defaultEmojiResolver.toSlack(emoji);
+    const name = slackEmoji.replace(/:/g, "");
 
     try {
       await this.client.reactions.remove({
