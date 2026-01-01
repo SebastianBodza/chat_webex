@@ -191,10 +191,10 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     const messageIdMatch = conversationId.match(/messageid=(\d+)/);
     const messageId = messageIdMatch?.[1] || activity.replyToId || "";
 
-    // Build thread ID (strip the messageid part for the thread)
-    const baseConversationId = conversationId.split(";")[0] || conversationId;
+    // Build thread ID - KEEP the full conversation ID including ;messageid=XXX
+    // This is required for Teams to reply in the correct thread
     const threadId = this.encodeThreadId({
-      conversationId: baseConversationId,
+      conversationId: conversationId,
       serviceUrl: activity.serviceUrl || "",
     });
 
