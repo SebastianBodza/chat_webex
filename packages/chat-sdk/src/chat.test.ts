@@ -227,12 +227,163 @@ describe("Chat", () => {
     expect(helpHandler).toHaveBeenCalled();
   });
 
+  describe("isMention property", () => {
+    it("should set isMention=true when bot is mentioned", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onNewMention(handler);
+
+      const message = createTestMessage("Hey @slack-bot help me");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      expect(handler).toHaveBeenCalled();
+      // The message passed to handler should have isMention set
+      const [, receivedMessage] = handler.mock.calls[0];
+      expect(receivedMessage.isMention).toBe(true);
+    });
+
+    it("should set isMention=false when bot is not mentioned", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onNewMessage(/help/i, handler);
+
+      const message = createTestMessage("I need help");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      expect(handler).toHaveBeenCalled();
+      const [, receivedMessage] = handler.mock.calls[0];
+      expect(receivedMessage.isMention).toBe(false);
+    });
+
+    it("should set isMention=true in subscribed thread when mentioned", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onSubscribedMessage(handler);
+
+      // Subscribe to the thread
+      await mockState.subscribe("slack:C123:1234.5678");
+
+      // Message with @mention
+      const message = createTestMessage("Hey @slack-bot what about this?");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      expect(handler).toHaveBeenCalled();
+      const [, receivedMessage] = handler.mock.calls[0];
+      expect(receivedMessage.isMention).toBe(true);
+    });
+  });
+
+  describe("onNewMention behavior in subscribed threads", () => {
+    it("should NOT call onNewMention for mentions in subscribed threads", async () => {
+      const mentionHandler = vi.fn().mockResolvedValue(undefined);
+      const subscribedHandler = vi.fn().mockResolvedValue(undefined);
+
+      chat.onNewMention(mentionHandler);
+      chat.onSubscribedMessage(subscribedHandler);
+
+      // Subscribe to the thread first
+      await mockState.subscribe("slack:C123:1234.5678");
+
+      // Now send a message WITH @mention in the subscribed thread
+      const message = createTestMessage("Hey @slack-bot are you there?");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      // onSubscribedMessage should fire, NOT onNewMention
+      expect(subscribedHandler).toHaveBeenCalled();
+      expect(mentionHandler).not.toHaveBeenCalled();
+    });
+
+    it("should call onNewMention only for mentions in unsubscribed threads", async () => {
+      const mentionHandler = vi.fn().mockResolvedValue(undefined);
+      const subscribedHandler = vi.fn().mockResolvedValue(undefined);
+
+      chat.onNewMention(mentionHandler);
+      chat.onSubscribedMessage(subscribedHandler);
+
+      // Thread is NOT subscribed - send a message with @mention
+      const message = createTestMessage("Hey @slack-bot help me");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      // onNewMention should fire, NOT onSubscribedMessage
+      expect(mentionHandler).toHaveBeenCalled();
+      expect(subscribedHandler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("thread.isSubscribed()", () => {
+    it("should return true for subscribed threads", async () => {
+      let capturedThread: { isSubscribed: () => Promise<boolean> } | null =
+        null;
+      const handler = vi.fn().mockImplementation(async (thread) => {
+        capturedThread = thread;
+      });
+      chat.onSubscribedMessage(handler);
+
+      await mockState.subscribe("slack:C123:1234.5678");
+      const message = createTestMessage("Follow up");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      expect(capturedThread).not.toBeNull();
+      // In subscribed context, isSubscribed() should short-circuit to true
+      const isSubscribed = await capturedThread!.isSubscribed();
+      expect(isSubscribed).toBe(true);
+    });
+
+    it("should return false for unsubscribed threads", async () => {
+      let capturedThread: { isSubscribed: () => Promise<boolean> } | null =
+        null;
+      const handler = vi.fn().mockImplementation(async (thread) => {
+        capturedThread = thread;
+      });
+      chat.onNewMention(handler);
+
+      const message = createTestMessage("Hey @slack-bot help");
+
+      await chat.handleIncomingMessage(
+        mockAdapter,
+        "slack:C123:1234.5678",
+        message,
+      );
+
+      expect(capturedThread).not.toBeNull();
+      const isSubscribed = await capturedThread!.isSubscribed();
+      expect(isSubscribed).toBe(false);
+    });
+  });
+
   describe("Reactions", () => {
     it("should call onReaction handler for all reactions", async () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onReaction(handler);
 
-      const event: ReactionEvent = {
+      const event: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
@@ -253,14 +404,19 @@ describe("Chat", () => {
       // Wait for async processing
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(handler).toHaveBeenCalledWith(event);
+      expect(handler).toHaveBeenCalled();
+      // Verify the event includes thread and all original properties
+      const receivedEvent = handler.mock.calls[0][0] as ReactionEvent;
+      expect(receivedEvent.emoji).toBe(event.emoji);
+      expect(receivedEvent.rawEmoji).toBe(event.rawEmoji);
+      expect(receivedEvent.thread).toBeDefined();
     });
 
     it("should call onReaction handler for specific emoji", async () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onReaction(["thumbs_up", "heart"], handler);
 
-      const thumbsUpEvent: ReactionEvent = {
+      const thumbsUpEvent: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
@@ -277,7 +433,7 @@ describe("Chat", () => {
         raw: {},
       };
 
-      const fireEvent: ReactionEvent = {
+      const fireEvent: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("fire"),
         rawEmoji: "fire",
         added: true,
@@ -299,14 +455,16 @@ describe("Chat", () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(thumbsUpEvent);
+      // Check the handler was called with thumbs_up emoji
+      const receivedEvent = handler.mock.calls[0][0] as ReactionEvent;
+      expect(receivedEvent.emoji).toBe(thumbsUpEvent.emoji);
     });
 
     it("should skip reactions from self", async () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onReaction(handler);
 
-      const event: ReactionEvent = {
+      const event: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
@@ -334,7 +492,7 @@ describe("Chat", () => {
       // Filter by raw emoji format
       chat.onReaction(["+1"], handler);
 
-      const event: ReactionEvent = {
+      const event: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: true,
@@ -354,14 +512,16 @@ describe("Chat", () => {
       chat.processReaction(event);
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(handler).toHaveBeenCalledWith(event);
+      expect(handler).toHaveBeenCalled();
+      const receivedEvent = handler.mock.calls[0][0] as ReactionEvent;
+      expect(receivedEvent.rawEmoji).toBe(event.rawEmoji);
     });
 
     it("should handle removed reactions", async () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onReaction(handler);
 
-      const event: ReactionEvent = {
+      const event: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("thumbs_up"),
         rawEmoji: "+1",
         added: false,
@@ -381,7 +541,7 @@ describe("Chat", () => {
       chat.processReaction(event);
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(handler).toHaveBeenCalledWith(event);
+      expect(handler).toHaveBeenCalled();
       expect(handler.mock.calls[0][0].added).toBe(false);
     });
 
@@ -391,7 +551,7 @@ describe("Chat", () => {
       chat.onReaction(["thumbs_up", "heart", "fire", "rocket"], handler);
 
       // Teams sends rawEmoji: "like" which gets normalized to EmojiValue with name: "thumbs_up"
-      const teamsEvent: ReactionEvent = {
+      const teamsEvent: Omit<ReactionEvent, "thread"> = {
         emoji: getEmoji("thumbs_up"), // Normalized by fromTeams()
         rawEmoji: "like", // Teams format
         added: true,
@@ -412,7 +572,8 @@ describe("Chat", () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(teamsEvent);
+      const receivedEvent = handler.mock.calls[0][0] as ReactionEvent;
+      expect(receivedEvent.emoji).toBe(teamsEvent.emoji);
     });
 
     it("should match EmojiValue by object identity", async () => {
@@ -421,7 +582,7 @@ describe("Chat", () => {
       // Register with EmojiValue object
       chat.onReaction([thumbsUp], handler);
 
-      const event: ReactionEvent = {
+      const event: Omit<ReactionEvent, "thread"> = {
         emoji: thumbsUp, // Same EmojiValue singleton
         rawEmoji: "like",
         added: true,
@@ -441,7 +602,73 @@ describe("Chat", () => {
       chat.processReaction(event);
       await new Promise((r) => setTimeout(r, 10));
 
-      expect(handler).toHaveBeenCalledWith(event);
+      expect(handler).toHaveBeenCalled();
+    });
+
+    it("should include thread property in ReactionEvent", async () => {
+      const handler = vi.fn().mockResolvedValue(undefined);
+      chat.onReaction(handler);
+
+      const event: Omit<ReactionEvent, "thread"> = {
+        emoji: getEmoji("thumbs_up"),
+        rawEmoji: "+1",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalled();
+      const receivedEvent = handler.mock.calls[0][0] as ReactionEvent;
+      // Verify thread is present and has expected properties
+      expect(receivedEvent.thread).toBeDefined();
+      expect(receivedEvent.thread.id).toBe("slack:C123:1234.5678");
+      expect(typeof receivedEvent.thread.post).toBe("function");
+      expect(typeof receivedEvent.thread.isSubscribed).toBe("function");
+    });
+
+    it("should allow posting from reaction thread", async () => {
+      const handler = vi.fn().mockImplementation(async (event: ReactionEvent) => {
+        await event.thread.post("Thanks for the reaction!");
+      });
+      chat.onReaction(handler);
+
+      const event: Omit<ReactionEvent, "thread"> = {
+        emoji: getEmoji("thumbs_up"),
+        rawEmoji: "+1",
+        added: true,
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+      };
+
+      chat.processReaction(event);
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(handler).toHaveBeenCalled();
+      expect(mockAdapter.postMessage).toHaveBeenCalledWith(
+        "slack:C123:1234.5678",
+        "Thanks for the reaction!",
+      );
     });
   });
 });

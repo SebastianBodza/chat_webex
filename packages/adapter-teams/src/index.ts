@@ -212,7 +212,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       const rawEmoji = reaction.type || "";
       const emojiValue = defaultEmojiResolver.fromTeams(rawEmoji);
 
-      const event: Omit<ReactionEvent, "adapter"> = {
+      const event: Omit<ReactionEvent, "adapter" | "thread"> = {
         emoji: emojiValue,
         rawEmoji,
         added: true,
@@ -237,7 +237,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       const rawEmoji = reaction.type || "";
       const emojiValue = defaultEmojiResolver.fromTeams(rawEmoji);
 
-      const event: Omit<ReactionEvent, "adapter"> = {
+      const event: Omit<ReactionEvent, "adapter" | "thread"> = {
         emoji: emojiValue,
         rawEmoji,
         added: false,

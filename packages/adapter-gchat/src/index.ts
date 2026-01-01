@@ -698,7 +698,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     // This is done lazily when the reaction is processed
     const chat = this.chat;
     const buildReactionEvent = async (): Promise<
-      Omit<ReactionEvent, "adapter">
+      Omit<ReactionEvent, "adapter" | "thread"> & { adapter: GoogleChatAdapter }
     > => {
       let threadId: string;
 
@@ -748,12 +748,13 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         messageId: messageName,
         threadId,
         raw: notification,
+        adapter: this,
       };
     };
 
     // Process reaction with lazy thread resolution
     const processTask = buildReactionEvent().then((reactionEvent) => {
-      chat.processReaction({ ...reactionEvent, adapter: this }, options);
+      chat.processReaction(reactionEvent, options);
     });
 
     if (options?.waitUntil) {

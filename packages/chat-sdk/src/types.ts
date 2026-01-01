@@ -231,7 +231,7 @@ export interface ChatInstance {
    * @param options - Webhook options including waitUntil
    */
   processReaction(
-    event: Omit<ReactionEvent, "adapter"> & { adapter?: Adapter },
+    event: Omit<ReactionEvent, "adapter" | "thread"> & { adapter?: Adapter },
     options?: WebhookOptions,
   ): void;
 
@@ -307,19 +307,71 @@ export interface Thread<TRawMessage = unknown> {
   /** Async iterator for all messages in the thread */
   allMessages: AsyncIterable<Message<TRawMessage>>;
 
-  /** Subscribe to future messages in this thread */
+  /**
+   * Check if this thread is currently subscribed.
+   *
+   * In subscribed message handlers, this is optimized to return true immediately
+   * without a state lookup, since we already know we're in a subscribed context.
+   *
+   * @returns Promise resolving to true if subscribed, false otherwise
+   */
+  isSubscribed(): Promise<boolean>;
+
+  /**
+   * Subscribe to future messages in this thread.
+   *
+   * Once subscribed, all messages in this thread will trigger `onSubscribedMessage` handlers.
+   * The initial message that triggered subscription will NOT fire the handler.
+   *
+   * @example
+   * ```typescript
+   * chat.onNewMention(async (thread, message) => {
+   *   await thread.subscribe();  // Subscribe to follow-up messages
+   *   await thread.post("I'm now watching this thread!");
+   * });
+   * ```
+   */
   subscribe(): Promise<void>;
 
-  /** Unsubscribe from this thread */
+  /**
+   * Unsubscribe from this thread.
+   *
+   * Future messages will no longer trigger `onSubscribedMessage` handlers.
+   */
   unsubscribe(): Promise<void>;
 
-  /** Post a message to this thread */
+  /**
+   * Post a message to this thread.
+   *
+   * @param message - String or PostableMessage to send
+   * @returns A SentMessage with methods to edit, delete, or add reactions
+   *
+   * @example
+   * ```typescript
+   * // Simple string
+   * await thread.post("Hello!");
+   *
+   * // Markdown
+   * await thread.post({ markdown: "**Bold** and _italic_" });
+   *
+   * // With emoji
+   * await thread.post(`${emoji.thumbs_up} Great job!`);
+   * ```
+   */
   post(message: string | PostableMessage): Promise<SentMessage<TRawMessage>>;
 
-  /** Show typing indicator */
+  /**
+   * Show typing indicator in the thread.
+   *
+   * Some platforms support persistent typing indicators, others just send once.
+   */
   startTyping(): Promise<void>;
 
-  /** Refresh recentMessages from the API */
+  /**
+   * Refresh `recentMessages` from the API.
+   *
+   * Fetches the latest 50 messages and updates `recentMessages`.
+   */
   refresh(): Promise<void>;
 
   /**
@@ -381,6 +433,24 @@ export interface Message<TRawMessage = unknown> {
   metadata: MessageMetadata;
   /** Attachments */
   attachments: Attachment[];
+
+  /**
+   * Whether the bot is @-mentioned in this message.
+   *
+   * This is set by the Chat SDK before passing the message to handlers.
+   * It checks for `@username` in the message text using the adapter's
+   * configured `userName` and optional `botUserId`.
+   *
+   * @example
+   * ```typescript
+   * chat.onSubscribedMessage(async (thread, message) => {
+   *   if (message.isMention) {
+   *     await thread.post("You mentioned me!");
+   *   }
+   * });
+   * ```
+   */
+  isMention?: boolean;
 }
 
 /** Raw message returned from adapter (before wrapping as SentMessage) */
@@ -483,16 +553,71 @@ export interface Attachment {
 // Event Handlers
 // =============================================================================
 
+/**
+ * Handler for new @-mentions of the bot.
+ *
+ * **Important**: This handler is ONLY called for mentions in **unsubscribed** threads.
+ * Once a thread is subscribed (via `thread.subscribe()`), subsequent messages
+ * including @-mentions go to `onSubscribedMessage` handlers instead.
+ *
+ * To detect mentions in subscribed threads, check `message.isMention`:
+ *
+ * @example
+ * ```typescript
+ * // Handle new mentions (unsubscribed threads only)
+ * chat.onNewMention(async (thread, message) => {
+ *   await thread.subscribe();  // Subscribe to follow-up messages
+ *   await thread.post("Hello! I'll be watching this thread.");
+ * });
+ *
+ * // Handle all messages in subscribed threads
+ * chat.onSubscribedMessage(async (thread, message) => {
+ *   if (message.isMention) {
+ *     // User @-mentioned us in a thread we're already watching
+ *     await thread.post("You mentioned me again!");
+ *   }
+ * });
+ * ```
+ */
 export type MentionHandler = (
   thread: Thread,
   message: Message,
 ) => Promise<void>;
 
+/**
+ * Handler for messages matching a regex pattern.
+ *
+ * Registered via `chat.onNewMessage(pattern, handler)`. Called when a message
+ * matches the pattern in an unsubscribed thread.
+ */
 export type MessageHandler = (
   thread: Thread,
   message: Message,
 ) => Promise<void>;
 
+/**
+ * Handler for messages in subscribed threads.
+ *
+ * Called for all messages in threads that have been subscribed via `thread.subscribe()`.
+ * This includes:
+ * - Follow-up messages from users
+ * - Messages that @-mention the bot (check `message.isMention`)
+ *
+ * Does NOT fire for:
+ * - The message that triggered the subscription (e.g., the initial @mention)
+ * - Messages sent by the bot itself
+ *
+ * @example
+ * ```typescript
+ * chat.onSubscribedMessage(async (thread, message) => {
+ *   // Handle all follow-up messages
+ *   if (message.isMention) {
+ *     // User @-mentioned us in a subscribed thread
+ *   }
+ *   await thread.post(`Got your message: ${message.text}`);
+ * });
+ * ```
+ */
 export type SubscribedMessageHandler = (
   thread: Thread,
   message: Message,
@@ -701,6 +826,18 @@ export interface ReactionEvent<TRawMessage = unknown> {
   messageId: string;
   /** The thread ID */
   threadId: string;
+  /**
+   * The thread where the reaction occurred.
+   * Use this to post replies or check subscription status.
+   *
+   * @example
+   * ```typescript
+   * chat.onReaction([emoji.thumbs_up], async (event) => {
+   *   await event.thread.post(`Thanks for the ${event.emoji}!`);
+   * });
+   * ```
+   */
+  thread: Thread<TRawMessage>;
   /** The adapter that received the event */
   adapter: Adapter;
   /** Platform-specific raw event data */

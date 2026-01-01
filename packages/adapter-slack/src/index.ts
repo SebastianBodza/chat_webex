@@ -361,7 +361,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       (this._botId !== null && event.user === this._botId);
 
     // Build reaction event
-    const reactionEvent: Omit<ReactionEvent, "adapter"> = {
+    const reactionEvent: Omit<ReactionEvent, "adapter" | "thread"> = {
       emoji: normalizedEmoji,
       rawEmoji,
       added: event.type === "reaction_added",

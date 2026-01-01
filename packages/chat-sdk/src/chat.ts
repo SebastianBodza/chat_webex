@@ -192,6 +192,29 @@ export class Chat<
 
   /**
    * Register a handler for new @-mentions of the bot.
+   *
+   * **Important**: This handler is ONLY called for mentions in **unsubscribed** threads.
+   * Once a thread is subscribed (via `thread.subscribe()`), subsequent messages
+   * including @-mentions go to `onSubscribedMessage` handlers instead.
+   *
+   * To detect mentions in subscribed threads, check `message.isMention`:
+   *
+   * @example
+   * ```typescript
+   * // Handle new mentions (unsubscribed threads only)
+   * chat.onNewMention(async (thread, message) => {
+   *   await thread.subscribe();  // Subscribe to follow-up messages
+   *   await thread.post("Hello! I'll be watching this thread.");
+   * });
+   *
+   * // Handle all messages in subscribed threads
+   * chat.onSubscribedMessage(async (thread, message) => {
+   *   if (message.isMention) {
+   *     // User @-mentioned us in a thread we're already watching
+   *     await thread.post("You mentioned me again!");
+   *   }
+   * });
+   * ```
    */
   onNewMention(handler: MentionHandler): void {
     this.mentionHandlers.push(handler);
@@ -199,7 +222,18 @@ export class Chat<
   }
 
   /**
-   * Register a handler for messages matching a pattern.
+   * Register a handler for messages matching a regex pattern.
+   *
+   * @param pattern - Regular expression to match against message text
+   * @param handler - Handler called when pattern matches
+   *
+   * @example
+   * ```typescript
+   * // Match messages starting with "!help"
+   * chat.onNewMessage(/^!help/, async (thread, message) => {
+   *   await thread.post("Available commands: !help, !status, !ping");
+   * });
+   * ```
    */
   onNewMessage(pattern: RegExp, handler: MessageHandler): void {
     this.messagePatterns.push({ pattern, handler });
@@ -210,9 +244,26 @@ export class Chat<
 
   /**
    * Register a handler for messages in subscribed threads.
-   * This will NOT fire for:
+   *
+   * Called for all messages in threads that have been subscribed via `thread.subscribe()`.
+   * This includes:
+   * - Follow-up messages from users
+   * - Messages that @-mention the bot (check `message.isMention`)
+   *
+   * Does NOT fire for:
    * - The message that triggered the subscription (e.g., the initial @mention)
    * - Messages sent by the bot itself
+   *
+   * @example
+   * ```typescript
+   * chat.onSubscribedMessage(async (thread, message) => {
+   *   // Handle all follow-up messages
+   *   if (message.isMention) {
+   *     // User @-mentioned us in a subscribed thread
+   *   }
+   *   await thread.post(`Got your message: ${message.text}`);
+   * });
+   * ```
    */
   onSubscribedMessage(handler: SubscribedMessageHandler): void {
     this.subscribedMessageHandlers.push(handler);
@@ -299,10 +350,10 @@ export class Chat<
    * Handles waitUntil registration and error catching internally.
    */
   processReaction(
-    event: Omit<ReactionEvent, "adapter"> & { adapter?: Adapter },
+    event: Omit<ReactionEvent, "adapter" | "thread"> & { adapter?: Adapter },
     options?: WebhookOptions,
   ): void {
-    const task = this.handleReactionEvent(event as ReactionEvent).catch(
+    const task = this.handleReactionEvent(event).catch(
       (err) => {
         this.logger.error("Reaction processing error", {
           error: err,
@@ -320,7 +371,9 @@ export class Chat<
   /**
    * Handle a reaction event internally.
    */
-  private async handleReactionEvent(event: ReactionEvent): Promise<void> {
+  private async handleReactionEvent(
+    event: Omit<ReactionEvent, "adapter" | "thread"> & { adapter?: Adapter },
+  ): Promise<void> {
     this.logger.debug("Incoming reaction", {
       adapter: event.adapter?.name,
       emoji: event.emoji,
@@ -339,6 +392,28 @@ export class Chat<
       return;
     }
 
+    // Adapter is required for thread creation
+    if (!event.adapter) {
+      this.logger.error("Reaction event missing adapter");
+      return;
+    }
+
+    // Create thread for the reaction event
+    const isSubscribed = await this.state.isSubscribed(event.threadId);
+    const thread = await this.createThread(
+      event.adapter,
+      event.threadId,
+      event.message ?? ({} as Message),
+      isSubscribed,
+    );
+
+    // Build full event with thread and adapter
+    const fullEvent: ReactionEvent = {
+      ...event,
+      adapter: event.adapter,
+      thread,
+    };
+
     // Run matching handlers
     this.logger.debug("Checking reaction handlers", {
       handlerCount: this.reactionHandlers.length,
@@ -350,31 +425,34 @@ export class Chat<
       // If no emoji filter, run handler for all reactions
       if (emojiFilter.length === 0) {
         this.logger.debug("Running catch-all reaction handler");
-        await handler(event);
+        await handler(fullEvent);
         continue;
       }
 
       // Check if the reaction matches any of the specified emoji
       const matches = emojiFilter.some((filter) => {
         // EmojiValue object identity comparison (recommended)
-        if (filter === event.emoji) return true;
+        if (filter === fullEvent.emoji) return true;
 
         // String comparison: check against emoji name or rawEmoji
         const filterName = typeof filter === "string" ? filter : filter.name;
-        return filterName === event.emoji.name || filterName === event.rawEmoji;
+        return (
+          filterName === fullEvent.emoji.name ||
+          filterName === fullEvent.rawEmoji
+        );
       });
 
       this.logger.debug("Reaction filter check", {
         filterEmoji: emojiFilter.map((e) =>
           typeof e === "string" ? e : e.name,
         ),
-        eventEmoji: event.emoji.name,
+        eventEmoji: fullEvent.emoji.name,
         matches,
       });
 
       if (matches) {
         this.logger.debug("Running matched reaction handler");
-        await handler(event);
+        await handler(fullEvent);
       }
     }
   }
@@ -455,8 +533,8 @@ export class Chat<
     this.logger.debug("Lock acquired", { threadId, token: lock.token });
 
     try {
-      // Create thread object
-      const thread = await this.createThread(adapter, threadId, message);
+      // Set isMention on the message for handler access
+      message.isMention = this.detectMention(adapter, message);
 
       // Check if this is a subscribed thread first
       const isSubscribed = await this.state.isSubscribed(threadId);
@@ -465,6 +543,15 @@ export class Chat<
         isSubscribed,
         subscribedHandlerCount: this.subscribedMessageHandlers.length,
       });
+
+      // Create thread object (with subscription context for optimization)
+      const thread = await this.createThread(
+        adapter,
+        threadId,
+        message,
+        isSubscribed,
+      );
+
       if (isSubscribed) {
         this.logger.debug("Message in subscribed thread - calling handlers", {
           threadId,
@@ -475,8 +562,7 @@ export class Chat<
       }
 
       // Check for @-mention of bot
-      const isMention = this.detectMention(adapter, message);
-      if (isMention) {
+      if (message.isMention) {
         this.logger.debug("Bot mentioned", {
           threadId,
           text: message.text.slice(0, 100),
@@ -525,6 +611,7 @@ export class Chat<
     adapter: Adapter,
     threadId: string,
     initialMessage: Message,
+    isSubscribedContext = false,
   ): Promise<Thread> {
     // Parse thread ID to get channel info
     // Format: "adapter:channel:thread"
@@ -537,6 +624,7 @@ export class Chat<
       channelId,
       state: this.state,
       initialMessage,
+      isSubscribedContext,
     });
   }
 

@@ -22,6 +22,8 @@ interface ThreadImplConfig {
   channelId: string;
   state: StateAdapter;
   initialMessage?: Message;
+  /** If true, thread is known to be subscribed (for short-circuit optimization) */
+  isSubscribedContext?: boolean;
 }
 
 export class ThreadImpl implements Thread {
@@ -31,12 +33,14 @@ export class ThreadImpl implements Thread {
 
   private state: StateAdapter;
   private _recentMessages: Message[] = [];
+  private _isSubscribedContext: boolean;
 
   constructor(config: ThreadImplConfig) {
     this.id = config.id;
     this.adapter = config.adapter;
     this.channelId = config.channelId;
     this.state = config.state;
+    this._isSubscribedContext = config.isSubscribedContext ?? false;
 
     if (config.initialMessage) {
       this._recentMessages = [config.initialMessage];
@@ -84,6 +88,14 @@ export class ThreadImpl implements Thread {
         }
       },
     };
+  }
+
+  async isSubscribed(): Promise<boolean> {
+    // Short-circuit if we know we're in a subscribed context
+    if (this._isSubscribedContext) {
+      return true;
+    }
+    return this.state.isSubscribed(this.id);
   }
 
   async subscribe(): Promise<void> {
