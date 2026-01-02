@@ -124,7 +124,8 @@ export function createMockBotAdapter() {
   // Counter for generated conversation IDs
   let conversationCounter = 0;
 
-  // Mock createConversationAsync that returns a conversation reference
+  // Mock createConversationAsync that calls the callback with a turn context
+  // The conversation ID is captured from within the callback, not the return value
   const mockCreateConversationAsync = vi.fn(
     async (
       _appId: string,
@@ -132,15 +133,21 @@ export function createMockBotAdapter() {
       _serviceUrl: string,
       _audience: string,
       params: { members?: Array<{ id: string }> },
-      _callback: () => Promise<void>,
+      callback: (context: unknown) => Promise<void>,
     ) => {
       conversationCounter++;
       const conversationId = `dm-conversation-${conversationCounter}`;
       const userId = params?.members?.[0]?.id || "unknown";
       createdConversations.push({ conversationId, userId });
-      return {
-        conversation: { id: conversationId },
+
+      // Call the callback with a mock turn context containing the conversation ID
+      const mockTurnContext = {
+        activity: {
+          conversation: { id: conversationId },
+          id: `activity-${conversationCounter}`,
+        },
       };
+      await callback(mockTurnContext);
     },
   );
 

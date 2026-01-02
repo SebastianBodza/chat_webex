@@ -840,49 +840,32 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       );
     }
 
-    // Create a conversation reference for the 1:1 chat
-    const conversationReference: Partial<ConversationReference> = {
-      channelId: "msteams",
-      serviceUrl,
-      bot: {
-        id: this.config.appId,
-        name: this.userName,
-      },
-    };
-
     let conversationId = "";
 
-    // Create the 1:1 conversation
-    await this.botAdapter.continueConversationAsync(
+    // Create the 1:1 conversation using createConversationAsync
+    // The conversation ID is captured from within the callback, not from the return value
+    // biome-ignore lint/suspicious/noExplicitAny: BotBuilder types are incomplete
+    await (this.botAdapter as any).createConversationAsync(
       this.config.appId,
-      conversationReference,
-      async (context) => {
-        // Create conversation parameters
-        const members = [{ id: userId }];
-
-        // biome-ignore lint/suspicious/noExplicitAny: BotBuilder types are incomplete
-        const result = await (context.adapter as any).createConversationAsync(
-          this.config.appId,
-          "msteams",
-          serviceUrl,
-          "", // empty audience
-          {
-            isGroup: false,
-            bot: { id: this.config.appId, name: this.userName },
-            members,
-            tenantId,
-          },
-          // The callback is optional in the newer SDK but types require it
-          async () => {},
-        );
-
-        // Get conversation ID from the result
-        conversationId = result?.activityId || result?.id || "";
-
-        // If we got a context reference back, extract the conversation ID
-        if (result?.conversation?.id) {
-          conversationId = result.conversation.id;
-        }
+      "msteams",
+      serviceUrl,
+      "", // empty audience
+      {
+        isGroup: false,
+        bot: { id: this.config.appId, name: this.userName },
+        members: [{ id: userId }],
+        tenantId,
+        channelData: {
+          tenant: { id: tenantId },
+        },
+      },
+      async (turnContext: TurnContext) => {
+        // Capture the conversation ID from the new context
+        conversationId = turnContext.activity.conversation?.id || "";
+        this.logger?.debug("Teams: conversation created in callback", {
+          conversationId,
+          activityId: turnContext.activity.id,
+        });
       },
     );
 

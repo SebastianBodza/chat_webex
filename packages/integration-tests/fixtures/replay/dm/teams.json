@@ -1,7 +1,7 @@
 {
   "botName": "Chat SDK Demo",
   "botUserId": "28:57627569-c120-42a1-9e6f-7cb4b96cc8ef",
-  "_comment": "Teams DM functionality is not yet working. This fixture has scaffolding for when it's implemented.",
+  "_comment": "Teams DM is implemented but dmMessage fixture is null since DM wasn't working during recording. Re-record to capture a real DM message.",
   "mention": {
     "text": "<at>Chat SDK Demo</at> Hey",
     "textFormat": "plain",
