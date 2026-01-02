@@ -65,7 +65,7 @@ export interface GoogleChatButton {
   onClick: {
     action: {
       function: string;
-      parameters?: Array<{ key: string; value: string }>;
+      parameters: Array<{ key: string; value: string }>;
     };
   };
   color?: { red: number; green: number; blue: number };
@@ -76,7 +76,7 @@ export interface GoogleChatButton {
  */
 export function cardToGoogleCard(
   card: CardElement,
-  cardId?: string,
+  cardId?: string
 ): GoogleChatCard {
   const sections: GoogleChatCardSection[] = [];
 
@@ -198,7 +198,7 @@ function convertDividerToWidget(_element: DividerElement): GoogleChatWidget {
 
 function convertActionsToWidget(element: ActionsElement): GoogleChatWidget {
   const buttons: GoogleChatButton[] = element.children.map((button) =>
-    convertButtonToGoogleButton(button),
+    convertButtonToGoogleButton(button)
   );
 
   return {
@@ -212,9 +212,7 @@ function convertButtonToGoogleButton(button: ButtonElement): GoogleChatButton {
     onClick: {
       action: {
         function: button.id,
-        parameters: button.value
-          ? [{ key: "value", value: button.value }]
-          : undefined,
+        parameters: button.value ? [{ key: "value", value: button.value }] : [],
       },
     },
   };
@@ -283,7 +281,9 @@ function childToFallbackText(child: CardChild): string | null {
         .map((f) => `*${convertEmoji(f.label)}*: ${convertEmoji(f.value)}`)
         .join("\n");
     case "actions":
-      return `[${child.children.map((b) => convertEmoji(b.label)).join("] [")}]`;
+      return `[${child.children
+        .map((b) => convertEmoji(b.label))
+        .join("] [")}]`;
     case "section":
       return child.children
         .map((c) => childToFallbackText(c))
