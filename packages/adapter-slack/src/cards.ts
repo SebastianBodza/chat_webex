@@ -5,17 +5,25 @@
  * @see https://api.slack.com/block-kit
  */
 
-import type {
-  ActionsElement,
-  ButtonElement,
-  CardChild,
-  CardElement,
-  DividerElement,
-  FieldsElement,
-  ImageElement,
-  SectionElement,
-  TextElement,
+import {
+  type ActionsElement,
+  type ButtonElement,
+  type CardChild,
+  type CardElement,
+  convertEmojiPlaceholders,
+  type DividerElement,
+  type FieldsElement,
+  type ImageElement,
+  type SectionElement,
+  type TextElement,
 } from "chat-sdk";
+
+/**
+ * Convert emoji placeholders in text to Slack format.
+ */
+function convertEmoji(text: string): string {
+  return convertEmojiPlaceholders(text, "slack");
+}
 
 // Slack Block Kit types (simplified)
 export interface SlackBlock {
@@ -50,7 +58,7 @@ export function cardToBlockKit(card: CardElement): SlackBlock[] {
       type: "header",
       text: {
         type: "plain_text",
-        text: card.title,
+        text: convertEmoji(card.title),
         emoji: true,
       },
     });
@@ -63,7 +71,7 @@ export function cardToBlockKit(card: CardElement): SlackBlock[] {
       elements: [
         {
           type: "mrkdwn",
-          text: card.subtitle,
+          text: convertEmoji(card.subtitle),
         },
       ],
     });
@@ -110,7 +118,7 @@ function convertChildToBlocks(child: CardChild): SlackBlock[] {
 }
 
 function convertTextToBlock(element: TextElement): SlackBlock {
-  const text = element.content;
+  const text = convertEmoji(element.content);
   let formattedText = text;
 
   // Apply style
@@ -161,7 +169,7 @@ function convertButtonToElement(button: ButtonElement): SlackButtonElement {
     type: "button",
     text: {
       type: "plain_text",
-      text: button.label,
+      text: convertEmoji(button.label),
       emoji: true,
     },
     action_id: button.id,
@@ -196,7 +204,7 @@ function convertFieldsToBlock(element: FieldsElement): SlackBlock {
     // Add label and value as separate field items
     fields.push({
       type: "mrkdwn",
-      text: `*${field.label}*\n${field.value}`,
+      text: `*${convertEmoji(field.label)}*\n${convertEmoji(field.value)}`,
     });
   }
 
@@ -214,11 +222,11 @@ export function cardToFallbackText(card: CardElement): string {
   const parts: string[] = [];
 
   if (card.title) {
-    parts.push(`*${card.title}*`);
+    parts.push(`*${convertEmoji(card.title)}*`);
   }
 
   if (card.subtitle) {
-    parts.push(card.subtitle);
+    parts.push(convertEmoji(card.subtitle));
   }
 
   for (const child of card.children) {
@@ -234,11 +242,13 @@ export function cardToFallbackText(card: CardElement): string {
 function childToFallbackText(child: CardChild): string | null {
   switch (child.type) {
     case "text":
-      return child.content;
+      return convertEmoji(child.content);
     case "fields":
-      return child.children.map((f) => `${f.label}: ${f.value}`).join("\n");
+      return child.children
+        .map((f) => `${convertEmoji(f.label)}: ${convertEmoji(f.value)}`)
+        .join("\n");
     case "actions":
-      return `[${child.children.map((b) => b.label).join("] [")}]`;
+      return `[${child.children.map((b) => convertEmoji(b.label)).join("] [")}]`;
     case "section":
       return child.children
         .map((c) => childToFallbackText(c))

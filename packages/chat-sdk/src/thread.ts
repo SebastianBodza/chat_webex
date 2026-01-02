@@ -1,4 +1,6 @@
 import type { Root } from "mdast";
+import type { CardElement } from "./cards";
+import { cardToFallbackText } from "./cards";
 import { type CardJSXElement, isJSX, toCardElement } from "./jsx-runtime";
 import {
   paragraph,
@@ -257,6 +259,26 @@ function extractMessageContent(message: PostableMessage): {
       plainText: toPlainText(message.ast),
       formatted: message.ast,
       attachments: message.attachments || [],
+    };
+  }
+
+  if ("card" in message) {
+    // PostableCard - generate fallback text from card
+    const fallbackText = message.fallbackText || cardToFallbackText(message.card);
+    return {
+      plainText: fallbackText,
+      formatted: root([paragraph([textNode(fallbackText)])]),
+      attachments: [],
+    };
+  }
+
+  if ("type" in message && message.type === "card") {
+    // Direct CardElement
+    const fallbackText = cardToFallbackText(message);
+    return {
+      plainText: fallbackText,
+      formatted: root([paragraph([textNode(fallbackText)])]),
+      attachments: [],
     };
   }
 

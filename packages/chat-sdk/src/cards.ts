@@ -553,3 +553,54 @@ function extractTextContent(children: unknown): string {
   }
   return "";
 }
+
+// ============================================================================
+// Fallback Text Generation
+// ============================================================================
+
+/**
+ * Generate plain text fallback from a CardElement.
+ * Used for platforms/clients that can't render rich cards,
+ * and for the SentMessage.text property.
+ */
+export function cardToFallbackText(card: CardElement): string {
+  const parts: string[] = [];
+
+  if (card.title) {
+    parts.push(card.title);
+  }
+
+  if (card.subtitle) {
+    parts.push(card.subtitle);
+  }
+
+  for (const child of card.children) {
+    const text = childToFallbackText(child);
+    if (text) {
+      parts.push(text);
+    }
+  }
+
+  return parts.join("\n");
+}
+
+/**
+ * Generate fallback text from a card child element.
+ */
+function childToFallbackText(child: CardChild): string | null {
+  switch (child.type) {
+    case "text":
+      return child.content;
+    case "fields":
+      return child.children.map((f) => `${f.label}: ${f.value}`).join("\n");
+    case "actions":
+      return `[${child.children.map((b) => b.label).join("] [")}]`;
+    case "section":
+      return child.children
+        .map((c) => childToFallbackText(c))
+        .filter(Boolean)
+        .join("\n");
+    default:
+      return null;
+  }
+}
