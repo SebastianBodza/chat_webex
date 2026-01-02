@@ -13,17 +13,23 @@
         "displayName": "Malte Ubl",
         "type": "HUMAN"
       },
-      "eventTime": "2026-01-02T03:55:00.000000Z",
+      "eventTime": "2026-01-02T23:32:28.751807Z",
       "messagePayload": {
-        "space": { "name": "spaces/AAQADmenPpY", "type": "ROOM" },
+        "space": {
+          "name": "spaces/AAQAO1heGsE",
+          "type": "ROOM",
+          "displayName": "Test Chat SDK 4",
+          "spaceType": "SPACE"
+        },
         "message": {
-          "name": "spaces/AAQADmenPpY/messages/hCCyDOha7-o.hCCyDOha7-o",
+          "name": "spaces/AAQAO1heGsE/messages/A6woZAHrIjs.A6woZAHrIjs",
           "sender": {
             "name": "users/117994873354375860089",
             "displayName": "Malte Ubl",
             "type": "HUMAN"
           },
-          "text": "@Chat SDK Demo Test",
+          "createTime": "2026-01-02T23:32:28.751807Z",
+          "text": "@Chat SDK Demo Hey",
           "annotations": [
             {
               "type": "USER_MENTION",
@@ -32,14 +38,52 @@
               "userMention": {
                 "user": {
                   "name": "users/113977916201552346146",
+                  "displayName": "Chat SDK Demo",
                   "type": "BOT"
                 },
                 "type": "MENTION"
               }
             }
           ],
-          "thread": { "name": "spaces/AAQADmenPpY/threads/hCCyDOha7-o" },
-          "space": { "name": "spaces/AAQADmenPpY" }
+          "thread": { "name": "spaces/AAQAO1heGsE/threads/A6woZAHrIjs" },
+          "space": { "name": "spaces/AAQAO1heGsE" }
+        }
+      }
+    }
+  },
+  "action": {
+    "commonEventObject": {
+      "userLocale": "en",
+      "hostApp": "CHAT",
+      "platform": "WEB",
+      "parameters": {
+        "actionId": "hello"
+      }
+    },
+    "chat": {
+      "user": {
+        "name": "users/117994873354375860089",
+        "displayName": "Malte Ubl",
+        "type": "HUMAN"
+      },
+      "eventTime": "2026-01-02T23:32:34.175996Z",
+      "buttonClickedPayload": {
+        "space": {
+          "name": "spaces/AAQAO1heGsE",
+          "type": "ROOM",
+          "displayName": "Test Chat SDK 4",
+          "spaceType": "SPACE"
+        },
+        "message": {
+          "name": "spaces/AAQAO1heGsE/messages/A6woZAHrIjs.9qQCF6JGUNg",
+          "sender": {
+            "name": "users/113977916201552346146",
+            "displayName": "Chat SDK Demo",
+            "type": "BOT"
+          },
+          "createTime": "2026-01-02T23:32:31.646079Z",
+          "thread": { "name": "spaces/AAQAO1heGsE/threads/A6woZAHrIjs" },
+          "space": { "name": "spaces/AAQAO1heGsE" }
         }
       }
     }

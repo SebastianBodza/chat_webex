@@ -178,10 +178,12 @@ describe("Replay Tests - Actions & Reactions", () => {
 
   describe("Google Chat", () => {
     let ctx: GchatTestContext;
+    let capturedAction: ActionEvent | null = null;
     let capturedReaction: ReactionEvent | null = null;
 
     beforeEach(() => {
       vi.clearAllMocks();
+      capturedAction = null;
       capturedReaction = null;
 
       ctx = createGchatTestContext(
@@ -189,6 +191,10 @@ describe("Replay Tests - Actions & Reactions", () => {
         {
           onMention: async (thread) => {
             await thread.subscribe();
+          },
+          onAction: async (event) => {
+            capturedAction = event;
+            await event.thread.post(`Action received: ${event.actionId}`);
           },
           onReaction: async (event) => {
             capturedReaction = event;
@@ -200,6 +206,28 @@ describe("Replay Tests - Actions & Reactions", () => {
 
     afterEach(async () => {
       await ctx.chat.shutdown();
+    });
+
+    it("should handle card button click", async () => {
+      // First subscribe via mention
+      await ctx.sendWebhook(gchatFixtures.mention);
+      ctx.mockChatApi.clearMocks();
+
+      // Send button click payload
+      await ctx.sendWebhook(gchatFixtures.action);
+
+      expectValidAction(capturedAction, {
+        actionId: "hello",
+        userId: "users/117994873354375860089",
+        userName: "Malte Ubl",
+        adapterName: "gchat",
+        isDM: false,
+      });
+
+      // Verify threadId format
+      expect(capturedAction?.threadId).toContain("gchat:spaces/");
+
+      expectSentMessage(ctx.mockChatApi, "Action received: hello");
     });
 
     it("should handle reaction via Pub/Sub", async () => {
