@@ -76,7 +76,7 @@ export interface GoogleChatButton {
  */
 export function cardToGoogleCard(
   card: CardElement,
-  cardId?: string
+  cardId?: string,
 ): GoogleChatCard {
   const sections: GoogleChatCardSection[] = [];
 
@@ -198,7 +198,7 @@ function convertDividerToWidget(_element: DividerElement): GoogleChatWidget {
 
 function convertActionsToWidget(element: ActionsElement): GoogleChatWidget {
   const buttons: GoogleChatButton[] = element.children.map((button) =>
-    convertButtonToGoogleButton(button)
+    convertButtonToGoogleButton(button),
   );
 
   return {

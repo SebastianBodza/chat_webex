@@ -74,7 +74,6 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   private formatConverter = new TeamsFormatConverter();
   private config: TeamsAdapterConfig;
 
-
   constructor(config: TeamsAdapterConfig) {
     this.config = config;
     this.userName = config.userName || "bot";
@@ -157,7 +156,9 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     if (activity.from?.id && activity.serviceUrl) {
       const cacheKey = `teams:serviceUrl:${activity.from.id}`;
       // Store for 30 days (serviceUrls are stable per tenant)
-      this.chat.getState().set(cacheKey, activity.serviceUrl, 30 * 24 * 60 * 60 * 1000);
+      this.chat
+        .getState()
+        .set(cacheKey, activity.serviceUrl, 30 * 24 * 60 * 60 * 1000);
     }
 
     // Handle message reactions

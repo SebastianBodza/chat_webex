@@ -15,12 +15,7 @@ import {
 import { createSlackAdapter, type SlackAdapter } from "@chat-sdk/slack";
 import { createMemoryState } from "@chat-sdk/state-memory";
 import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
-import {
-  Chat,
-  type ActionEvent,
-  type ReactionEvent,
-  type Thread,
-} from "chat-sdk";
+import { type ActionEvent, Chat, type ReactionEvent } from "chat-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import gchatFixtures from "../fixtures/replay/actions-reactions/gchat.json";
 import slackFixtures from "../fixtures/replay/actions-reactions/slack.json";

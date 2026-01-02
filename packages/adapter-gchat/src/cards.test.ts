@@ -143,7 +143,7 @@ describe("cardToGoogleCard", () => {
       onClick: {
         action: {
           function: "approve",
-          parameters: undefined,
+          parameters: [],
         },
       },
       color: { red: 0.2, green: 0.5, blue: 0.9 }, // primary blue
@@ -165,7 +165,7 @@ describe("cardToGoogleCard", () => {
       onClick: {
         action: {
           function: "skip",
-          parameters: undefined,
+          parameters: [],
         },
       },
     });
