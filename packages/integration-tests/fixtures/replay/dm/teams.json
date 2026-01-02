@@ -1,0 +1,78 @@
+{
+  "botName": "Chat SDK Demo",
+  "botUserId": "28:57627569-c120-42a1-9e6f-7cb4b96cc8ef",
+  "_comment": "Teams DM functionality is not yet working. This fixture has scaffolding for when it's implemented.",
+  "mention": {
+    "text": "<at>Chat SDK Demo</at> Hey",
+    "textFormat": "plain",
+    "type": "message",
+    "timestamp": "2026-01-02T18:03:37.1995342Z",
+    "id": "1767377017138",
+    "channelId": "msteams",
+    "serviceUrl": "https://smba.trafficmanager.net/amer/ed6e6740-934d-4088-a05e-caa14d8d89ee/",
+    "from": {
+      "id": "29:198PbJuwlbYy4Gp7p3PZrunMBts-QmZieTANExeuaryFy4cfQknJFVwlT8esy8B9zQNy3qcVqoBZKj2oYDP6HHQ",
+      "name": "Malte Ubl",
+      "aadObjectId": "7a9b12a6-4f02-43f1-b6f9-fd10e047f903"
+    },
+    "conversation": {
+      "isGroup": true,
+      "conversationType": "channel",
+      "tenantId": "ed6e6740-934d-4088-a05e-caa14d8d89ee",
+      "id": "19:d441d38c655c47a085215b2726e76927@thread.tacv2;messageid=1767377017138"
+    },
+    "recipient": {
+      "id": "28:57627569-c120-42a1-9e6f-7cb4b96cc8ef",
+      "name": "Chat SDK Demo"
+    },
+    "entities": [
+      {
+        "mentioned": {
+          "id": "28:57627569-c120-42a1-9e6f-7cb4b96cc8ef",
+          "name": "Chat SDK Demo"
+        },
+        "text": "<at>Chat SDK Demo</at>",
+        "type": "mention"
+      }
+    ],
+    "channelData": {
+      "teamsChannelId": "19:d441d38c655c47a085215b2726e76927@thread.tacv2",
+      "teamsTeamId": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2",
+      "tenant": {
+        "id": "ed6e6740-934d-4088-a05e-caa14d8d89ee"
+      }
+    }
+  },
+  "dmRequest": {
+    "text": "dm me",
+    "textFormat": "plain",
+    "type": "message",
+    "timestamp": "2026-01-02T18:03:47.1833425Z",
+    "id": "1767377027135",
+    "channelId": "msteams",
+    "serviceUrl": "https://smba.trafficmanager.net/amer/ed6e6740-934d-4088-a05e-caa14d8d89ee/",
+    "from": {
+      "id": "29:198PbJuwlbYy4Gp7p3PZrunMBts-QmZieTANExeuaryFy4cfQknJFVwlT8esy8B9zQNy3qcVqoBZKj2oYDP6HHQ",
+      "name": "Malte Ubl",
+      "aadObjectId": "7a9b12a6-4f02-43f1-b6f9-fd10e047f903"
+    },
+    "conversation": {
+      "isGroup": true,
+      "conversationType": "channel",
+      "tenantId": "ed6e6740-934d-4088-a05e-caa14d8d89ee",
+      "id": "19:d441d38c655c47a085215b2726e76927@thread.tacv2;messageid=1767377017138"
+    },
+    "recipient": {
+      "id": "28:57627569-c120-42a1-9e6f-7cb4b96cc8ef",
+      "name": "Chat SDK Demo"
+    },
+    "channelData": {
+      "teamsChannelId": "19:d441d38c655c47a085215b2726e76927@thread.tacv2",
+      "teamsTeamId": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2",
+      "tenant": {
+        "id": "ed6e6740-934d-4088-a05e-caa14d8d89ee"
+      }
+    }
+  },
+  "dmMessage": null
+}

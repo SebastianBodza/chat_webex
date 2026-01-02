@@ -152,13 +152,20 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
     const activity = context.activity;
 
-    // Cache serviceUrl for the user - needed for opening DMs later
+    // Cache serviceUrl and tenantId for the user - needed for opening DMs later
     if (activity.from?.id && activity.serviceUrl) {
-      const cacheKey = `teams:serviceUrl:${activity.from.id}`;
-      // Store for 30 days (serviceUrls are stable per tenant)
+      const userId = activity.from.id;
+      const tenantId = (activity.channelData as { tenant?: { id?: string } })
+        ?.tenant?.id;
+      const ttl = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+      // Store serviceUrl and tenantId for DM creation
       this.chat
         .getState()
-        .set(cacheKey, activity.serviceUrl, 30 * 24 * 60 * 60 * 1000);
+        .set(`teams:serviceUrl:${userId}`, activity.serviceUrl, ttl);
+      if (tenantId) {
+        this.chat.getState().set(`teams:tenantId:${userId}`, tenantId, ttl);
+      }
     }
 
     // Handle message reactions
@@ -802,22 +809,36 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
    * Open a direct message conversation with a user.
    * Returns a thread ID that can be used to post messages.
    *
-   * The serviceUrl is automatically resolved from cached user interactions.
-   * If no cached serviceUrl is found, a default is used (which may not work
-   * for all tenants).
+   * The serviceUrl and tenantId are automatically resolved from cached user interactions.
+   * If no cached values are found, defaults are used (which may not work for all tenants).
    */
   async openDM(userId: string): Promise<string> {
-    // Look up cached serviceUrl for this user from state
-    const cacheKey = `teams:serviceUrl:${userId}`;
-    const cachedServiceUrl = await this.chat?.getState().get<string>(cacheKey);
+    // Look up cached serviceUrl and tenantId for this user from state
+    const cachedServiceUrl = await this.chat
+      ?.getState()
+      .get<string>(`teams:serviceUrl:${userId}`);
+    const cachedTenantId = await this.chat
+      ?.getState()
+      .get<string>(`teams:tenantId:${userId}`);
+
     const serviceUrl =
       cachedServiceUrl || "https://smba.trafficmanager.net/teams/";
+    // Use cached tenant ID, config tenant ID, or undefined (will fail for multi-tenant)
+    const tenantId = cachedTenantId || this.config.appTenantId;
 
     this.logger?.debug("Teams: creating 1:1 conversation", {
       userId,
       serviceUrl,
-      cached: !!cachedServiceUrl,
+      tenantId,
+      cachedServiceUrl: !!cachedServiceUrl,
+      cachedTenantId: !!cachedTenantId,
     });
+
+    if (!tenantId) {
+      throw new Error(
+        "Cannot open DM: tenant ID not found. User must interact with the bot first (via @mention) to cache their tenant ID.",
+      );
+    }
 
     // Create a conversation reference for the 1:1 chat
     const conversationReference: Partial<ConversationReference> = {
@@ -849,7 +870,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
             isGroup: false,
             bot: { id: this.config.appId, name: this.userName },
             members,
-            tenantId: this.config.appTenantId,
+            tenantId,
           },
           // The callback is optional in the newer SDK but types require it
           async () => {},

@@ -118,6 +118,31 @@ export function createMockBotAdapter() {
   const sentActivities: unknown[] = [];
   const updatedActivities: unknown[] = [];
   const deletedActivities: string[] = [];
+  const createdConversations: Array<{ conversationId: string; userId: string }> =
+    [];
+
+  // Counter for generated conversation IDs
+  let conversationCounter = 0;
+
+  // Mock createConversationAsync that returns a conversation reference
+  const mockCreateConversationAsync = vi.fn(
+    async (
+      _appId: string,
+      _channel: string,
+      _serviceUrl: string,
+      _audience: string,
+      params: { members?: Array<{ id: string }> },
+      _callback: () => Promise<void>,
+    ) => {
+      conversationCounter++;
+      const conversationId = `dm-conversation-${conversationCounter}`;
+      const userId = params?.members?.[0]?.id || "unknown";
+      createdConversations.push({ conversationId, userId });
+      return {
+        conversation: { id: conversationId },
+      };
+    },
+  );
 
   // Create reusable mock context factory
   const createMockContext = (activity: unknown) => ({
@@ -132,12 +157,17 @@ export function createMockBotAdapter() {
     deleteActivity: vi.fn(async (id: string) => {
       deletedActivities.push(id);
     }),
+    // For openDM - provides access to adapter.createConversationAsync
+    adapter: {
+      createConversationAsync: mockCreateConversationAsync,
+    },
   });
 
   return {
     sentActivities,
     updatedActivities,
     deletedActivities,
+    createdConversations,
     // Mock the handleActivity method - called during webhook handling
     handleActivity: vi.fn(
       async (
@@ -160,10 +190,14 @@ export function createMockBotAdapter() {
         await handler(mockContext);
       },
     ),
+    // Direct access to createConversationAsync mock for assertions
+    createConversationAsync: mockCreateConversationAsync,
     clearMocks: () => {
       sentActivities.length = 0;
       updatedActivities.length = 0;
       deletedActivities.length = 0;
+      createdConversations.length = 0;
+      conversationCounter = 0;
     },
   };
 }

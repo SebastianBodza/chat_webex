@@ -223,6 +223,12 @@ export function createMockGoogleChatApi() {
           type: "ROOM",
         },
       })),
+      findDirectMessage: vi.fn(async () => ({
+        data: { name: null },
+      })),
+      setup: vi.fn(async (params: { requestBody: { spaceType: string } }) => ({
+        data: { name: `spaces/dm-${Date.now()}` },
+      })),
     },
     clearMocks: () => {
       sentMessages.length = 0;
