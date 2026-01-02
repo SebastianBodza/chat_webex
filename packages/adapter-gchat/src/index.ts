@@ -119,6 +119,8 @@ export type GoogleChatAdapterConfig =
 export interface GoogleChatThreadId {
   spaceName: string;
   threadName?: string;
+  /** Whether this is a DM space */
+  isDM?: boolean;
 }
 
 /** Google Chat message structure */
@@ -165,6 +167,10 @@ export interface GoogleChatSpace {
   type: string;
   displayName?: string;
   spaceThreadingState?: string;
+  /** Space type in newer API format: "SPACE", "GROUP_CHAT", "DIRECT_MESSAGE" */
+  spaceType?: string;
+  /** Whether this is a single-user DM with the bot */
+  singleUserBotDm?: boolean;
 }
 
 /** Google Chat user structure */
@@ -1009,10 +1015,17 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     }
 
     const message = messagePayload.message;
-    const threadName = message.thread?.name || message.name;
+    // For DMs, use space-only thread ID so all messages in the DM
+    // match the DM subscription created by openDM(). This treats the entire DM
+    // conversation as a single "thread" for subscription purposes.
+    const isDM =
+      messagePayload.space.type === "DM" ||
+      messagePayload.space.spaceType === "DIRECT_MESSAGE";
+    const threadName = isDM ? undefined : message.thread?.name || message.name;
     const threadId = this.encodeThreadId({
       spaceName: messagePayload.space.name,
       threadName,
+      isDM,
     });
 
     // Let Chat class handle async processing and waitUntil
@@ -1448,7 +1461,10 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
         this.logger?.debug("GChat API: Found existing DM space", {
           spaceName: findResponse.data.name,
         });
-        return this.encodeThreadId({ spaceName: findResponse.data.name });
+        return this.encodeThreadId({
+          spaceName: findResponse.data.name,
+          isDM: true,
+        });
       }
     } catch (error) {
       // 404 means no DM exists yet - we'll try to create one
@@ -1503,7 +1519,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
       this.logger?.debug("GChat API: spaces.setup response", { spaceName });
 
-      return this.encodeThreadId({ spaceName });
+      return this.encodeThreadId({ spaceName, isDM: true });
     } catch (error) {
       this.handleGoogleChatError(error, "openDM");
     }
@@ -1593,22 +1609,27 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     const threadPart = platformData.threadName
       ? `:${Buffer.from(platformData.threadName).toString("base64url")}`
       : "";
-    return `gchat:${platformData.spaceName}${threadPart}`;
+    // Add :dm suffix for DM threads to enable isDM() detection
+    const dmPart = platformData.isDM ? ":dm" : "";
+    return `gchat:${platformData.spaceName}${threadPart}${dmPart}`;
   }
 
   /**
    * Check if a thread is a direct message conversation.
-   * GChat DM space names typically contain "dm-" in the space name.
-   * This is a heuristic - for accurate detection, use fetchThread() to get space type.
+   * Checks for the :dm marker in the thread ID which is set when
+   * processing DM messages or opening DMs.
    */
   isDM(threadId: string): boolean {
-    const { spaceName } = this.decodeThreadId(threadId);
-    // DM space names typically contain "dm-" or follow the pattern "spaces/dm-..."
-    return spaceName.includes("dm-") || spaceName.includes("/dm");
+    // Check for explicit :dm marker in thread ID
+    return threadId.endsWith(":dm");
   }
 
   decodeThreadId(threadId: string): GoogleChatThreadId {
-    const parts = threadId.split(":");
+    // Remove :dm suffix if present
+    const isDM = threadId.endsWith(":dm");
+    const cleanId = isDM ? threadId.slice(0, -3) : threadId;
+
+    const parts = cleanId.split(":");
     if (parts.length < 2 || parts[0] !== "gchat") {
       throw new Error(`Invalid Google Chat thread ID: ${threadId}`);
     }
@@ -1618,7 +1639,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       ? Buffer.from(parts[2], "base64url").toString("utf-8")
       : undefined;
 
-    return { spaceName, threadName };
+    return { spaceName, threadName, isDM };
   }
 
   parseMessage(raw: unknown): Message<unknown> {

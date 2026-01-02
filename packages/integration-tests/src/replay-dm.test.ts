@@ -18,7 +18,7 @@ import {
 import { createSlackAdapter, type SlackAdapter } from "@chat-sdk/slack";
 import { createMemoryState } from "@chat-sdk/state-memory";
 import { createTeamsAdapter, type TeamsAdapter } from "@chat-sdk/teams";
-import { Chat, type Message, type Thread } from "chat-sdk";
+import { Chat, type Message } from "chat-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import gchatFixtures from "../fixtures/replay/dm/gchat.json";
 import slackFixtures from "../fixtures/replay/dm/slack.json";
@@ -222,6 +222,49 @@ describe("DM Replay Tests", () => {
       // The mention in DM should be captured
       expect(capturedMentionMessage).not.toBeNull();
     });
+
+    it("should receive user reply in DM when subscribed", async () => {
+      // Step 1: Initial mention to subscribe
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(slackFixtures.mention)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+
+      expect(capturedMentionMessage).not.toBeNull();
+
+      // Step 2: User requests DM - bot opens DM and subscribes
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(slackFixtures.dmRequest)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+
+      expect(openDMCalled).toBe(true);
+      expect(dmThreadId).not.toBeNull();
+
+      // Step 3: User sends message in DM
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(slackFixtures.dmMessage)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+
+      // Verify the DM reply was captured
+      expect(capturedDmMessage).not.toBeNull();
+      expect(capturedDmMessage?.text).toBe("Hey!");
+
+      // Verify the DM message is identified as im channel type
+      expect(slackFixtures.dmMessage.event.channel_type).toBe("im");
+
+      // Verify bot responded to the DM
+      expect(mockSlackClient.chat.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: slackFixtures.dmChannelId,
+          text: expect.stringContaining("Got your DM: Hey!"),
+        }),
+      );
+    });
   });
 
   describe("Google Chat", () => {
@@ -333,6 +376,49 @@ describe("DM Replay Tests", () => {
       expect(sender.displayName).toBe("Malte Ubl");
       expect(sender.type).toBe("HUMAN");
     });
+
+    it("should receive user reply in DM when subscribed", async () => {
+      // Step 1: Initial mention to subscribe
+      await chat.webhooks.gchat(createGchatRequest(gchatFixtures.mention), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      expect(capturedMentionMessage).not.toBeNull();
+
+      // Step 2: User requests DM via Pub/Sub - bot opens DM and subscribes
+      await chat.webhooks.gchat(createGchatRequest(gchatFixtures.dmRequest), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      expect(openDMCalled).toBe(true);
+
+      // Step 3: User sends message in DM
+      await chat.webhooks.gchat(createGchatRequest(gchatFixtures.dmMessage), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Verify the DM reply was captured
+      expect(capturedDmMessage).not.toBeNull();
+      expect(capturedDmMessage?.text).toBe("Thanks!");
+
+      // Verify the DM space is identified as DM
+      expect(gchatFixtures.dmMessage.chat.messagePayload.space.type).toBe("DM");
+      expect(gchatFixtures.dmMessage.chat.messagePayload.space.spaceType).toBe(
+        "DIRECT_MESSAGE",
+      );
+
+      // Verify bot responded to the DM
+      expect(mockChatApi.spaces.messages.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: expect.objectContaining({
+            text: expect.stringContaining("Got your DM: Thanks!"),
+          }),
+        }),
+      );
+    });
   });
 
   describe("Teams", () => {
@@ -342,6 +428,7 @@ describe("DM Replay Tests", () => {
 
     let capturedMentionMessage: Message | null = null;
     let capturedDmRequestMessage: Message | null = null;
+    let capturedDmReplyMessage: Message | null = null;
     let openDMCalled = false;
     let dmThreadId: string | null = null;
 
@@ -349,6 +436,7 @@ describe("DM Replay Tests", () => {
       vi.clearAllMocks();
       capturedMentionMessage = null;
       capturedDmRequestMessage = null;
+      capturedDmReplyMessage = null;
       openDMCalled = false;
       dmThreadId = null;
 
@@ -384,8 +472,13 @@ describe("DM Replay Tests", () => {
             await dmThread.post("Hello via DM!");
             await thread.post("I've sent you a DM!");
           } catch (e) {
-            await thread.post(`Sorry, couldn't send DM: ${(e as Error).message}`);
+            await thread.post(
+              `Sorry, couldn't send DM: ${(e as Error).message}`,
+            );
           }
+        } else if (thread.isDM) {
+          capturedDmReplyMessage = message;
+          await thread.post(`Got your DM: ${message.text}`);
         }
       });
 
@@ -453,6 +546,66 @@ describe("DM Replay Tests", () => {
       const mentionPayload = teamsFixtures.mention;
       expect(mentionPayload.conversation.conversationType).toBe("channel");
       expect(mentionPayload.conversation.id).toContain("19:");
+    });
+
+    it("should receive user reply in DM when subscribed", async () => {
+      // Configure mock to return the actual DM conversation ID from fixtures
+      // This ensures the subscription matches when the real DM message arrives
+      mockBotAdapter.createConversationAsync.mockImplementation(
+        async (...args: unknown[]) => {
+          const callback = args[args.length - 1] as
+            | ((context: unknown) => Promise<void>)
+            | undefined;
+          const mockTurnContext = {
+            activity: {
+              conversation: { id: teamsFixtures.dmConversationId },
+              id: "activity-dm",
+            },
+          };
+          if (typeof callback === "function") {
+            await callback(mockTurnContext);
+          }
+        },
+      );
+
+      // Step 1: Initial mention to subscribe (also caches serviceUrl and tenantId)
+      await chat.webhooks.teams(createTeamsRequest(teamsFixtures.mention), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      expect(capturedMentionMessage).not.toBeNull();
+
+      // Step 2: User requests DM in subscribed thread - bot opens DM and subscribes
+      await chat.webhooks.teams(createTeamsRequest(teamsFixtures.dmRequest), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      expect(openDMCalled).toBe(true);
+      expect(dmThreadId).not.toBeNull();
+
+      // Step 3: User sends message in DM
+      await chat.webhooks.teams(createTeamsRequest(teamsFixtures.dmMessage), {
+        waitUntil: tracker.waitUntil,
+      });
+      await tracker.waitForAll();
+
+      // Verify the DM reply was captured
+      expect(capturedDmReplyMessage).not.toBeNull();
+      expect(capturedDmReplyMessage?.text).toBe("Hey");
+
+      // Verify the DM message payload identifies as personal conversation
+      expect(teamsFixtures.dmMessage.conversation.conversationType).toBe(
+        "personal",
+      );
+
+      // Verify bot responded to the DM
+      expect(mockBotAdapter.sentActivities).toContainEqual(
+        expect.objectContaining({
+          text: expect.stringContaining("Got your DM: Hey"),
+        }),
+      );
     });
   });
 });

@@ -55,6 +55,8 @@ export interface SlackEvent {
   subtype?: string;
   username?: string;
   edited?: { ts: string };
+  /** Channel type: "channel", "group", "mpim", or "im" (DM) */
+  channel_type?: string;
   files?: Array<{
     id?: string;
     mimetype?: string;
@@ -447,7 +449,11 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       return;
     }
 
-    const threadTs = event.thread_ts || event.ts;
+    // For DMs (channel_type: "im"), use empty threadTs so all messages in the DM
+    // match the DM subscription created by openDM(). This treats the entire DM
+    // conversation as a single "thread" for subscription purposes.
+    const isDM = event.channel_type === "im";
+    const threadTs = isDM ? "" : event.thread_ts || event.ts;
     const threadId = this.encodeThreadId({
       channel: event.channel,
       threadTs,

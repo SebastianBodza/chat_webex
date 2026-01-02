@@ -38,7 +38,9 @@
       "teamsChannelId": "19:d441d38c655c47a085215b2726e76927@thread.tacv2",
       "teamsTeamId": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2",
       "channel": { "id": "19:d441d38c655c47a085215b2726e76927@thread.tacv2" },
-      "team": { "id": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2" },
+      "team": {
+        "id": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2"
+      },
       "tenant": { "id": "ed6e6740-934d-4088-a05e-caa14d8d89ee" }
     }
   },
@@ -68,10 +70,14 @@
     },
     "channelData": {
       "channel": { "id": "19:d441d38c655c47a085215b2726e76927@thread.tacv2" },
-      "team": { "id": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2" },
+      "team": {
+        "id": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2"
+      },
       "tenant": { "id": "ed6e6740-934d-4088-a05e-caa14d8d89ee" },
       "source": { "name": "message" },
-      "legacy": { "replyToId": "1:1aEb_t8xYcdQWHv96vLan89Vq2bzTp3wih6Cu23Gxk_I" }
+      "legacy": {
+        "replyToId": "1:1aEb_t8xYcdQWHv96vLan89Vq2bzTp3wih6Cu23Gxk_I"
+      }
     }
   },
   "reaction": {
@@ -97,9 +103,13 @@
     "reactionsAdded": [{ "type": "like" }],
     "channelData": {
       "channel": { "id": "19:d441d38c655c47a085215b2726e76927@thread.tacv2" },
-      "team": { "id": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2" },
+      "team": {
+        "id": "19:8j-Mnacwmq2QFDbzykeQH5v55m6cN1X3QJ5viHvGIIQ1@thread.tacv2"
+      },
       "tenant": { "id": "ed6e6740-934d-4088-a05e-caa14d8d89ee" },
-      "legacy": { "replyToId": "1:1fLA_RNPuIsZAvfb52Da3sgax9CKJ4lKCcz6sqX0k7FQ" }
+      "legacy": {
+        "replyToId": "1:1fLA_RNPuIsZAvfb52Da3sgax9CKJ4lKCcz6sqX0k7FQ"
+      }
     },
     "replyToId": "1767326111492"
   }

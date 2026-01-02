@@ -224,9 +224,9 @@ export function createMockGoogleChatApi() {
         },
       })),
       findDirectMessage: vi.fn(async () => ({
-        data: { name: null },
+        data: { name: null as string | null },
       })),
-      setup: vi.fn(async (params: { requestBody: { spaceType: string } }) => ({
+      setup: vi.fn(async (_params: { requestBody: { spaceType: string } }) => ({
         data: { name: `spaces/dm-${Date.now()}` },
       })),
     },

@@ -118,42 +118,42 @@ export function createMockBotAdapter() {
   const sentActivities: unknown[] = [];
   const updatedActivities: unknown[] = [];
   const deletedActivities: string[] = [];
-  const createdConversations: Array<{ conversationId: string; userId: string }> =
-    [];
+  const createdConversations: Array<{
+    conversationId: string;
+    userId: string;
+  }> = [];
 
   // Counter for generated conversation IDs
   let conversationCounter = 0;
 
   // Mock createConversationAsync that calls the callback with a turn context
   // The conversation ID is captured from within the callback, not the return value
-  const mockCreateConversationAsync = vi.fn(
-    async (...args: unknown[]) => {
-      conversationCounter++;
-      const conversationId = `dm-conversation-${conversationCounter}`;
+  const mockCreateConversationAsync = vi.fn(async (...args: unknown[]) => {
+    conversationCounter++;
+    const conversationId = `dm-conversation-${conversationCounter}`;
 
-      // The callback is the last argument
-      const callback = args[args.length - 1] as
-        | ((context: unknown) => Promise<void>)
-        | undefined;
+    // The callback is the last argument
+    const callback = args[args.length - 1] as
+      | ((context: unknown) => Promise<void>)
+      | undefined;
 
-      // The params (members) is the 5th argument (index 4)
-      const params = args[4] as { members?: Array<{ id: string }> } | undefined;
-      const userId = params?.members?.[0]?.id || "unknown";
-      createdConversations.push({ conversationId, userId });
+    // The params (members) is the 5th argument (index 4)
+    const params = args[4] as { members?: Array<{ id: string }> } | undefined;
+    const userId = params?.members?.[0]?.id || "unknown";
+    createdConversations.push({ conversationId, userId });
 
-      // Call the callback with a mock turn context containing the conversation ID
-      const mockTurnContext = {
-        activity: {
-          conversation: { id: conversationId },
-          id: `activity-${conversationCounter}`,
-        },
-      };
+    // Call the callback with a mock turn context containing the conversation ID
+    const mockTurnContext = {
+      activity: {
+        conversation: { id: conversationId },
+        id: `activity-${conversationCounter}`,
+      },
+    };
 
-      if (typeof callback === "function") {
-        await callback(mockTurnContext);
-      }
-    },
-  );
+    if (typeof callback === "function") {
+      await callback(mockTurnContext);
+    }
+  });
 
   // Create reusable mock context factory
   const createMockContext = (activity: unknown) => ({
