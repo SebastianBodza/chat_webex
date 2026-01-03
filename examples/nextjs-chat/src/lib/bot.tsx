@@ -58,7 +58,7 @@ bot.onNewMention(async (thread, message) => {
           <Field label="Platform" value={thread.adapter.name} />
           <Field label="Mode" value="AI Assistant" />
         </Fields>
-      </Card>
+      </Card>,
     );
 
     // Also respond to the initial message with AI
@@ -93,7 +93,7 @@ bot.onNewMention(async (thread, message) => {
           Goodbye
         </Button>
       </Actions>
-    </Card>
+    </Card>,
   );
 });
 
@@ -116,13 +116,13 @@ bot.onAction("info", async (event) => {
           value={threadState?.aiMode ? "Enabled" : "Disabled"}
         />
       </Fields>
-    </Card>
+    </Card>,
   );
 });
 
 bot.onAction("goodbye", async (event) => {
   await event.thread.post(
-    `${emoji.wave} Goodbye, ${event.user.fullName}! See you later.`
+    `${emoji.wave} Goodbye, ${event.user.fullName}! See you later.`,
   );
 });
 
@@ -143,7 +143,7 @@ bot.onNewMessage(/help/i, async (thread, message) => {
         <Text>{`${emoji.fire} React to my messages and I'll react back!`}</Text>
         <Text>{`${emoji.rocket} Active platforms: ${platforms}`}</Text>
       </Section>
-    </Card>
+    </Card>,
   );
 });
 
@@ -198,14 +198,14 @@ bot.onSubscribedMessage(async (thread, message) => {
           <Text>{`Hi ${message.author.fullName}! You requested a DM from the thread.`}</Text>
           <Divider />
           <Text>This is a private conversation between us.</Text>
-        </Card>
+        </Card>,
       );
       await thread.post(`${emoji.check} I've sent you a DM!`);
     } catch (err) {
       await thread.post(
         `${emoji.warning} Sorry, I couldn't send you a DM. Error: ${
           err instanceof Error ? err.message : "Unknown error"
-        }`
+        }`,
       );
     }
     return;
@@ -216,7 +216,7 @@ bot.onSubscribedMessage(async (thread, message) => {
     const attachmentInfo = message.attachments
       .map(
         (a) =>
-          `- ${a.name || "unnamed"} (${a.type}, ${a.mimeType || "unknown"})`
+          `- ${a.name || "unnamed"} (${a.type}, ${a.mimeType || "unknown"})`,
       )
       .join("\n");
 
@@ -224,7 +224,7 @@ bot.onSubscribedMessage(async (thread, message) => {
       <Card title={`${emoji.eyes} Attachments Received`}>
         <Text>{`You sent ${message.attachments.length} file(s):`}</Text>
         <Text>{attachmentInfo}</Text>
-      </Card>
+      </Card>,
     );
     return;
   }
@@ -249,7 +249,7 @@ bot.onReaction(["thumbs_up", "heart", "fire", "rocket"], async (event) => {
   if (event.adapter.name === "gchat" || event.adapter.name === "teams") {
     await event.adapter.postMessage(
       event.threadId,
-      `Thanks for the ${event.rawEmoji}!`
+      `Thanks for the ${event.rawEmoji}!`,
     );
     return;
   }
@@ -259,6 +259,6 @@ bot.onReaction(["thumbs_up", "heart", "fire", "rocket"], async (event) => {
   await event.adapter.addReaction(
     event.threadId,
     event.messageId,
-    emoji.raised_hands
+    emoji.raised_hands,
   );
 });

@@ -38,21 +38,19 @@ export interface ApiCallRecord {
 
 export type RecordEntry = WebhookRecord | ApiCallRecord;
 
-const RECORDING_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const RECORDING_TTL_SECONDS = 1 * 60 * 60; // 1 hour
 
 class Recorder {
   private redis: RedisClientType | null = null;
   private sessionId: string;
   private enabled: boolean;
-  private connected = false;
+  private connectPromise: Promise<void> | null = null;
 
   constructor() {
     this.enabled = process.env.RECORDING_ENABLED === "true";
     this.sessionId =
       process.env.RECORDING_SESSION_ID ||
-      `session-${
-        process.env.VERCEL_GIT_COMMIT_SHA || "local"
-      }-${new Date().toISOString()}-${Math.random().toString(36).slice(2, 8)}`;
+      `session-${process.env.VERCEL_GIT_COMMIT_SHA || "local"}`;
 
     if (this.enabled && process.env.REDIS_URL) {
       this.redis = createClient({ url: process.env.REDIS_URL });
@@ -63,11 +61,13 @@ class Recorder {
     }
   }
 
-  private async ensureConnected(): Promise<void> {
-    if (this.redis && !this.connected) {
-      await this.redis.connect();
-      this.connected = true;
+  private ensureConnected(): Promise<void> {
+    if (!this.redis) return Promise.resolve();
+
+    if (!this.connectPromise) {
+      this.connectPromise = this.redis.connect().then(() => {});
     }
+    return this.connectPromise;
   }
 
   get isEnabled(): boolean {
@@ -119,6 +119,10 @@ class Recorder {
     error?: Error,
   ): Promise<void> {
     if (!this.isEnabled || !this.redis) return;
+
+    if (response && response instanceof Response) {
+      response = await response.clone().text();
+    }
 
     const record: ApiCallRecord = {
       type: "api-call",
