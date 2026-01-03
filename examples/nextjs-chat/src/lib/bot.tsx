@@ -162,9 +162,7 @@ bot.onAction("messages", async (event) => {
         msg.text,
         msg.attachments && msg.attachments.length > 0,
       );
-      allMessages.push(
-        `#${count + 1} ${msg.author.userName}: ${displayText}`,
-      );
+      allMessages.push(`${count + 1}. ${msg.author.userName}: ${displayText}`);
       count++;
     }
 
@@ -179,7 +177,7 @@ bot.onAction("messages", async (event) => {
               );
               return `#${i + 1} ${m.author.userName}: ${displayText}`;
             })
-            .join("\n")
+            .join("\n\n")
         : "(no messages)";
 
     await thread.post(
@@ -206,7 +204,7 @@ bot.onAction("messages", async (event) => {
           <Text>**allMessages iterator**</Text>
           <Text>Iterates from oldest to newest using forward direction</Text>
           <Text>
-            {allMessages.length > 0 ? allMessages.join("\n") : "(no messages)"}
+            {allMessages.length > 0 ? allMessages.join("\n\n") : "(no messages)"}
           </Text>
         </Section>
       </Card>,
