@@ -1318,7 +1318,8 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     let hasMoreMessages = false;
 
     if (direction === "forward") {
-      // Forward direction: fetch all replies and paginate in chronological order
+      // Forward direction: fetch all replies and paginate in chronological order (oldest first)
+      // Graph API returns messages in descending order (newest first), so we must reverse
       const allMessages: GraphChatMessage[] = [];
       let nextLink: string | undefined;
       const graphClient = this.graphClient;
@@ -1336,6 +1337,9 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
         allMessages.push(...pageMessages);
         nextLink = response["@odata.nextLink"];
       } while (nextLink);
+
+      // Reverse to get chronological order (oldest first)
+      allMessages.reverse();
 
       // Find starting position based on cursor
       let startIndex = 0;
@@ -1349,8 +1353,8 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       hasMoreMessages = startIndex + limit < allMessages.length;
       graphMessages = allMessages.slice(startIndex, startIndex + limit);
     } else {
-      // Backward direction: replies endpoint returns in chronological order (oldest first)
-      // We need to get all and then return the most recent
+      // Backward direction: return most recent messages in chronological order
+      // Graph API returns messages in descending order (newest first)
       const allMessages: GraphChatMessage[] = [];
       let nextLink: string | undefined;
       const graphClient = this.graphClient;
@@ -1369,22 +1373,28 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
         nextLink = response["@odata.nextLink"];
       } while (nextLink);
 
-      // For backward, we want most recent first, then reverse for chronological output
+      // For backward, we want the most recent messages but in chronological order
+      // allMessages is newest first, so we reverse to get chronological
+      allMessages.reverse();
+
       if (cursor) {
-        // Find position of cursor and take messages before it
+        // Find position of cursor (cursor is timestamp of the oldest message in previous batch)
+        // We want messages OLDER than cursor (earlier in chronological order)
         const cursorIndex = allMessages.findIndex(
           (msg) => msg.createdDateTime && msg.createdDateTime >= cursor,
         );
         if (cursorIndex > 0) {
+          // Take messages before the cursor position
           const sliceStart = Math.max(0, cursorIndex - limit);
           graphMessages = allMessages.slice(sliceStart, cursorIndex);
           hasMoreMessages = sliceStart > 0;
         } else {
+          // Cursor not found or at start - take the most recent (end of array)
           graphMessages = allMessages.slice(-limit);
           hasMoreMessages = allMessages.length > limit;
         }
       } else {
-        // No cursor - get the most recent messages
+        // No cursor - get the most recent messages (end of chronological array)
         graphMessages = allMessages.slice(-limit);
         hasMoreMessages = allMessages.length > limit;
       }

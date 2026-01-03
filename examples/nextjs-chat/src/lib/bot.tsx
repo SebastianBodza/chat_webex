@@ -133,7 +133,7 @@ bot.onAction("messages", async (event) => {
 
   // Helper to get display text for a message (handles empty text from cards)
   const getDisplayText = (text: string, hasAttachments?: boolean) => {
-    if (text && text.trim()) {
+    if (text?.trim()) {
       const truncated = text.slice(0, 30);
       return text.length > 30 ? `${truncated}...` : truncated;
     }

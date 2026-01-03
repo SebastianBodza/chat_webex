@@ -592,6 +592,44 @@ describe("fetchMessages Replay Tests", () => {
       }
     });
 
+    it("should have author.userName for ALL messages (BUG CHECK)", async () => {
+      const result = await ctx.adapter.fetchMessages(TEAMS_THREAD_ID, {
+        limit: 100,
+      });
+
+      // Every message MUST have a non-empty author.userName
+      for (const msg of result.messages) {
+        expect(msg.author.userName).toBeTruthy();
+        expect(msg.author.userName).not.toBe("");
+        expect(msg.author.userName).not.toBe("unknown");
+      }
+
+      // Human messages should have "Malte Ubl" as userName
+      const humanMessages = result.messages.filter((m) => !m.author.isBot);
+      for (const msg of humanMessages) {
+        expect(msg.author.userName).toBe("Malte Ubl");
+      }
+
+      // Bot messages should have "Chat SDK Demo" as userName
+      const botMessages = result.messages.filter((m) => m.author.isBot);
+      for (const msg of botMessages) {
+        expect(msg.author.userName).toBe("Chat SDK Demo");
+      }
+    });
+
+    it("should have non-empty text for human messages (BUG CHECK)", async () => {
+      const result = await ctx.adapter.fetchMessages(TEAMS_THREAD_ID, {
+        limit: 100,
+      });
+
+      // Human messages should have non-empty text (numbered 1-13)
+      const humanMessages = result.messages.filter((m) => !m.author.isBot);
+      for (const msg of humanMessages) {
+        expect(msg.text).toBeTruthy();
+        expect(msg.text).not.toBe("");
+      }
+    });
+
     it("should handle adaptive card messages", async () => {
       const result = await ctx.adapter.fetchMessages(TEAMS_THREAD_ID, {
         limit: 100,

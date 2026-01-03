@@ -3,8 +3,6 @@
  * These are the raw API responses from actual platform calls.
  */
 
-import teamsGraphMessages from "./teams-graph-messages.json";
-
 // GChat fixture data
 export const GCHAT_THREAD_ID =
   "gchat:spaces/AAQAO1heGsE:c3BhY2VzL0FBUUFPMWhlR3NFL3RocmVhZHMvN2tJaS14N1NEQVk";
@@ -351,5 +349,217 @@ export const TEAMS_BOT_APP_ID = "57627569-c120-42a1-9e6f-7cb4b96cc8ef";
 export const TEAMS_HUMAN_USER_ID = "7a9b12a6-4f02-43f1-b6f9-fd10e047f903";
 
 // Raw Teams messages as returned by the Graph API (/messages/{id}/replies)
-// Sorted oldest to newest (by createdDateTime) - imported from JSON fixture
-export const TEAMS_RAW_MESSAGES = teamsGraphMessages;
+// Sorted oldest to newest (by createdDateTime)
+export const TEAMS_RAW_MESSAGES = [
+  {
+    id: "1767468442402",
+    createdDateTime: "2026-01-03T19:27:22.402Z",
+    from: {
+      application: { id: TEAMS_BOT_APP_ID, displayName: "Chat SDK Demo" },
+    },
+    body: {
+      contentType: "html",
+      content: '<attachment id="card1"></attachment>',
+    },
+    attachments: [
+      {
+        id: "card1",
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: JSON.stringify({
+          type: "AdaptiveCard",
+          body: [
+            {
+              type: "TextBlock",
+              text: "👋 Welcome!",
+              size: "large",
+              weight: "bolder",
+            },
+          ],
+        }),
+      },
+    ],
+  },
+  {
+    id: "1767468448941",
+    createdDateTime: "2026-01-03T19:27:28.941Z",
+    from: {
+      application: { id: TEAMS_BOT_APP_ID, displayName: "Chat SDK Demo" },
+    },
+    body: {
+      contentType: "html",
+      content: '<attachment id="card2"></attachment>',
+    },
+    attachments: [
+      {
+        id: "card2",
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: JSON.stringify({
+          type: "AdaptiveCard",
+          body: [
+            {
+              type: "TextBlock",
+              text: "📝 Message Fetch Results",
+              size: "large",
+              weight: "bolder",
+            },
+          ],
+        }),
+      },
+    ],
+  },
+  {
+    id: "1767468456333",
+    createdDateTime: "2026-01-03T19:27:36.333Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>1</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468460511",
+    createdDateTime: "2026-01-03T19:27:40.511Z",
+    from: {
+      application: { id: TEAMS_BOT_APP_ID, displayName: "Chat SDK Demo" },
+    },
+    body: {
+      contentType: "html",
+      content: "<p>✅ Thanks for your message!</p>",
+    },
+    attachments: [],
+  },
+  {
+    id: "1767468466140",
+    createdDateTime: "2026-01-03T19:27:46.14Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>2</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468467155",
+    createdDateTime: "2026-01-03T19:27:47.155Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>3</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468467781",
+    createdDateTime: "2026-01-03T19:27:47.781Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>4</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468468089",
+    createdDateTime: "2026-01-03T19:27:48.089Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>5</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468468249",
+    createdDateTime: "2026-01-03T19:27:48.249Z",
+    from: {
+      application: { id: TEAMS_BOT_APP_ID, displayName: "Chat SDK Demo" },
+    },
+    body: {
+      contentType: "html",
+      content: "<p>✅ Thanks for your message!</p>",
+    },
+    attachments: [],
+  },
+  {
+    id: "1767468468422",
+    createdDateTime: "2026-01-03T19:27:48.422Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>6</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468468771",
+    createdDateTime: "2026-01-03T19:27:48.771Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>7</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468469434",
+    createdDateTime: "2026-01-03T19:27:49.434Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>8</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468470373",
+    createdDateTime: "2026-01-03T19:27:50.373Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>9</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468475162",
+    createdDateTime: "2026-01-03T19:27:55.162Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>10</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468476187",
+    createdDateTime: "2026-01-03T19:27:56.187Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>11</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468477200",
+    createdDateTime: "2026-01-03T19:27:57.2Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>12</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468477507",
+    createdDateTime: "2026-01-03T19:27:57.507Z",
+    from: {
+      application: { id: TEAMS_BOT_APP_ID, displayName: "Chat SDK Demo" },
+    },
+    body: {
+      contentType: "html",
+      content: "<p>✅ Thanks for your message!</p>",
+    },
+    attachments: [],
+  },
+  {
+    id: "1767468478456",
+    createdDateTime: "2026-01-03T19:27:58.456Z",
+    from: { user: { id: TEAMS_HUMAN_USER_ID, displayName: "Malte Ubl" } },
+    body: { contentType: "html", content: "<p>13</p>" },
+    attachments: [],
+  },
+  {
+    id: "1767468486542",
+    createdDateTime: "2026-01-03T19:28:06.542Z",
+    from: {
+      application: { id: TEAMS_BOT_APP_ID, displayName: "Chat SDK Demo" },
+    },
+    body: {
+      contentType: "html",
+      content: '<attachment id="card3"></attachment>',
+    },
+    attachments: [
+      {
+        id: "card3",
+        contentType: "application/vnd.microsoft.card.adaptive",
+        content: JSON.stringify({
+          type: "AdaptiveCard",
+          body: [
+            {
+              type: "TextBlock",
+              text: "📝 Message Fetch Results",
+              size: "large",
+              weight: "bolder",
+            },
+          ],
+        }),
+      },
+    ],
+  },
+];
