@@ -8,6 +8,7 @@ import type {
   ChatInstance,
   EmojiValue,
   FetchOptions,
+  FetchResult,
   FileUpload,
   FormattedContent,
   Logger,
@@ -1056,35 +1057,157 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
   async fetchMessages(
     threadId: string,
     options: FetchOptions = {},
-  ): Promise<Message<unknown>[]> {
+  ): Promise<FetchResult<unknown>> {
     const { channel, threadTs } = this.decodeThreadId(threadId);
+    const direction = options.direction ?? "backward";
+    const limit = options.limit || 100;
 
     try {
-      this.logger?.debug("Slack API: conversations.replies", {
+      if (direction === "forward") {
+        // Forward direction: fetch oldest messages first, cursor moves to newer
+        // Uses native Slack cursor pagination which is efficient
+        return this.fetchMessagesForward(
+          channel,
+          threadTs,
+          threadId,
+          limit,
+          options.cursor,
+        );
+      }
+      // Backward direction: fetch most recent messages first, cursor moves to older
+      // Slack API returns oldest-first, so we need to work around this
+      return this.fetchMessagesBackward(
         channel,
         threadTs,
-        limit: options.limit || 100,
-      });
-
-      const result = await this.client.conversations.replies({
-        channel,
-        ts: threadTs,
-        limit: options.limit || 100,
-        cursor: options.before,
-      });
-
-      const messages = (result.messages || []) as SlackEvent[];
-
-      this.logger?.debug("Slack API: conversations.replies response", {
-        messageCount: messages.length,
-        ok: result.ok,
-      });
-
-      // Use sync version to avoid N API calls for user lookup
-      return messages.map((msg) => this.parseSlackMessageSync(msg, threadId));
+        threadId,
+        limit,
+        options.cursor,
+      );
     } catch (error) {
       this.handleSlackError(error);
     }
+  }
+
+  /**
+   * Fetch messages in forward direction (oldest first, efficient).
+   * Uses native Slack cursor pagination.
+   */
+  private async fetchMessagesForward(
+    channel: string,
+    threadTs: string,
+    threadId: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<FetchResult<unknown>> {
+    this.logger?.debug("Slack API: conversations.replies (forward)", {
+      channel,
+      threadTs,
+      limit,
+      cursor,
+    });
+
+    const result = await this.client.conversations.replies({
+      channel,
+      ts: threadTs,
+      limit,
+      cursor,
+    });
+
+    const slackMessages = (result.messages || []) as SlackEvent[];
+    const nextCursor = (
+      result as { response_metadata?: { next_cursor?: string } }
+    ).response_metadata?.next_cursor;
+
+    this.logger?.debug("Slack API: conversations.replies response", {
+      messageCount: slackMessages.length,
+      ok: result.ok,
+      hasNextCursor: !!nextCursor,
+    });
+
+    const messages = slackMessages.map((msg) =>
+      this.parseSlackMessageSync(msg, threadId),
+    );
+
+    return {
+      messages,
+      nextCursor: nextCursor || undefined,
+    };
+  }
+
+  /**
+   * Fetch messages in backward direction (most recent first).
+   *
+   * Slack's API returns oldest-first, so for backward direction we:
+   * 1. Use `latest` parameter to fetch messages before a timestamp (cursor)
+   * 2. Fetch up to 1000 messages (API limit) and take the last N
+   * 3. Return messages in chronological order (oldest first within the page)
+   *
+   * Note: For very large threads (>1000 messages), the first backward call
+   * may not return the absolute most recent messages. This is a Slack API limitation.
+   */
+  private async fetchMessagesBackward(
+    channel: string,
+    threadTs: string,
+    threadId: string,
+    limit: number,
+    cursor?: string,
+  ): Promise<FetchResult<unknown>> {
+    // Cursor is a timestamp - fetch messages before this time
+    // For the initial call (no cursor), we want the most recent messages
+    const latest = cursor || undefined;
+
+    this.logger?.debug("Slack API: conversations.replies (backward)", {
+      channel,
+      threadTs,
+      limit,
+      latest,
+    });
+
+    // Fetch a larger batch to ensure we can return the last `limit` messages
+    // Slack API max is 1000 messages per request
+    const fetchLimit = Math.min(1000, Math.max(limit * 2, 200));
+
+    const result = await this.client.conversations.replies({
+      channel,
+      ts: threadTs,
+      limit: fetchLimit,
+      latest,
+      inclusive: false, // Don't include the cursor message itself
+    });
+
+    const slackMessages = (result.messages || []) as SlackEvent[];
+
+    this.logger?.debug("Slack API: conversations.replies response (backward)", {
+      messageCount: slackMessages.length,
+      ok: result.ok,
+      hasMore: result.has_more,
+    });
+
+    // If we have more messages than requested, take the last `limit`
+    // This gives us the most recent messages
+    const startIndex = Math.max(0, slackMessages.length - limit);
+    const selectedMessages = slackMessages.slice(startIndex);
+
+    const messages = selectedMessages.map((msg) =>
+      this.parseSlackMessageSync(msg, threadId),
+    );
+
+    // For backward pagination, nextCursor points to older messages
+    // Use the timestamp of the oldest message we're NOT returning
+    let nextCursor: string | undefined;
+    if (startIndex > 0 || result.has_more) {
+      // There are more (older) messages available
+      // Use the timestamp of the oldest message in our selection as the cursor
+      const oldestSelected = selectedMessages[0];
+      if (oldestSelected?.ts) {
+        nextCursor = oldestSelected.ts;
+      }
+    }
+
+    return {
+      messages,
+      nextCursor,
+    };
   }
 
   async fetchThread(threadId: string): Promise<ThreadInfo> {

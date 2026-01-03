@@ -6,6 +6,7 @@ import type {
   ChatInstance,
   EmojiValue,
   FetchOptions,
+  FetchResult,
   FileUpload,
   FormattedContent,
   Logger,
@@ -1569,8 +1570,10 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   async fetchMessages(
     threadId: string,
     options: FetchOptions = {},
-  ): Promise<Message<unknown>[]> {
+  ): Promise<FetchResult<unknown>> {
     const { spaceName, threadName } = this.decodeThreadId(threadId);
+    const direction = options.direction ?? "backward";
+    const limit = options.limit || 100;
 
     // Use impersonated client if available (has better permissions for listing messages)
     const api = this.impersonatedChatApi || this.chatApi;
@@ -1579,56 +1582,204 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       // Build filter to scope to specific thread if threadName is available
       const filter = threadName ? `thread.name = "${threadName}"` : undefined;
 
-      this.logger?.debug("GChat API: spaces.messages.list", {
-        spaceName,
-        threadName,
-        filter,
-        pageSize: options.limit || 100,
-        impersonated: !!this.impersonatedChatApi,
-      });
-
-      const response = await api.spaces.messages.list({
-        parent: spaceName,
-        pageSize: options.limit || 100,
-        pageToken: options.before,
-        filter,
-      });
-
-      const messages = response.data.messages || [];
-
-      this.logger?.debug("GChat API: spaces.messages.list response", {
-        messageCount: messages.length,
-      });
-
-      return messages.map((msg) => {
-        const msgThreadId = this.encodeThreadId({
+      if (direction === "forward") {
+        // Forward direction: fetch oldest messages first
+        // GChat API always returns newest first, so we need to work around this
+        return this.fetchMessagesForward(
+          api,
           spaceName,
-          threadName: msg.thread?.name ?? undefined,
-        });
-        const msgIsBot = msg.sender?.type === "BOT";
-        return {
-          id: msg.name || "",
-          threadId: msgThreadId,
-          text: this.formatConverter.extractPlainText(msg.text || ""),
-          formatted: this.formatConverter.toAst(msg.text || ""),
-          raw: msg,
-          author: {
-            userId: msg.sender?.name || "unknown",
-            userName: msg.sender?.displayName || "unknown",
-            fullName: msg.sender?.displayName || "unknown",
-            isBot: msgIsBot,
-            isMe: msgIsBot,
-          },
-          metadata: {
-            dateSent: msg.createTime ? new Date(msg.createTime) : new Date(),
-            edited: false,
-          },
-          attachments: [],
-        };
-      });
+          threadId,
+          filter,
+          limit,
+          options.cursor,
+        );
+      }
+
+      // Backward direction (default): most recent messages first
+      // GChat API returns newest first, which matches this use case
+      return this.fetchMessagesBackward(
+        api,
+        spaceName,
+        threadId,
+        filter,
+        limit,
+        options.cursor,
+      );
     } catch (error) {
       this.handleGoogleChatError(error, "fetchMessages");
     }
+  }
+
+  /**
+   * Fetch messages in backward direction (most recent first).
+   * GChat API natively returns newest first, so this is efficient.
+   */
+  private async fetchMessagesBackward(
+    api: chat_v1.Chat,
+    spaceName: string,
+    threadId: string,
+    filter: string | undefined,
+    limit: number,
+    cursor?: string,
+  ): Promise<FetchResult<unknown>> {
+    this.logger?.debug("GChat API: spaces.messages.list (backward)", {
+      spaceName,
+      filter,
+      pageSize: limit,
+      cursor,
+    });
+
+    const response = await api.spaces.messages.list({
+      parent: spaceName,
+      pageSize: limit,
+      pageToken: cursor,
+      filter,
+    });
+
+    // GChat API returns newest first, reverse to get chronological order within page
+    const rawMessages = (response.data.messages || []).reverse();
+
+    this.logger?.debug("GChat API: spaces.messages.list response (backward)", {
+      messageCount: rawMessages.length,
+      hasNextPageToken: !!response.data.nextPageToken,
+    });
+
+    const messages = rawMessages.map((msg) =>
+      this.parseGChatListMessage(msg, spaceName, threadId),
+    );
+
+    return {
+      messages,
+      // nextPageToken points to older messages (backward pagination)
+      nextCursor: response.data.nextPageToken ?? undefined,
+    };
+  }
+
+  /**
+   * Fetch messages in forward direction (oldest first).
+   *
+   * GChat API always returns newest first with no option to reverse.
+   * For forward pagination, we:
+   * 1. If no cursor: Fetch ALL messages, return the first `limit` from oldest
+   * 2. If cursor: Cursor is a message name, skip to after that message
+   *
+   * Note: This is less efficient than backward for large message histories,
+   * as it requires fetching all messages to find the oldest ones.
+   */
+  private async fetchMessagesForward(
+    api: chat_v1.Chat,
+    spaceName: string,
+    threadId: string,
+    filter: string | undefined,
+    limit: number,
+    cursor?: string,
+  ): Promise<FetchResult<unknown>> {
+    this.logger?.debug("GChat API: spaces.messages.list (forward)", {
+      spaceName,
+      filter,
+      limit,
+      cursor,
+    });
+
+    // Fetch all messages (GChat returns newest first)
+    const allRawMessages: chat_v1.Schema$Message[] = [];
+    let pageToken: string | undefined;
+
+    do {
+      const response = await api.spaces.messages.list({
+        parent: spaceName,
+        pageSize: 1000, // Max page size for efficiency
+        pageToken,
+        filter,
+      });
+
+      const pageMessages = response.data.messages || [];
+      allRawMessages.push(...pageMessages);
+      pageToken = response.data.nextPageToken ?? undefined;
+    } while (pageToken);
+
+    // Reverse to get chronological order (oldest first)
+    allRawMessages.reverse();
+
+    this.logger?.debug(
+      "GChat API: fetched all messages for forward pagination",
+      {
+        totalCount: allRawMessages.length,
+      },
+    );
+
+    // Find starting position based on cursor
+    let startIndex = 0;
+    if (cursor) {
+      // Cursor is a message name - find the index after it
+      const cursorIndex = allRawMessages.findIndex(
+        (msg) => msg.name === cursor,
+      );
+      if (cursorIndex >= 0) {
+        startIndex = cursorIndex + 1;
+      }
+    }
+
+    // Get the requested slice
+    const selectedMessages = allRawMessages.slice(
+      startIndex,
+      startIndex + limit,
+    );
+
+    const messages = selectedMessages.map((msg) =>
+      this.parseGChatListMessage(msg, spaceName, threadId),
+    );
+
+    // Determine nextCursor - use message name of last returned message
+    let nextCursor: string | undefined;
+    if (
+      startIndex + limit < allRawMessages.length &&
+      selectedMessages.length > 0
+    ) {
+      const lastMsg = selectedMessages[selectedMessages.length - 1];
+      if (lastMsg?.name) {
+        nextCursor = lastMsg.name;
+      }
+    }
+
+    return {
+      messages,
+      nextCursor,
+    };
+  }
+
+  /**
+   * Parse a message from the list API into the standard Message format.
+   */
+  private parseGChatListMessage(
+    msg: chat_v1.Schema$Message,
+    spaceName: string,
+    threadId: string,
+  ) {
+    const msgThreadId = this.encodeThreadId({
+      spaceName,
+      threadName: msg.thread?.name ?? undefined,
+    });
+    const msgIsBot = msg.sender?.type === "BOT";
+    return {
+      id: msg.name || "",
+      threadId: msgThreadId,
+      text: this.formatConverter.extractPlainText(msg.text || ""),
+      formatted: this.formatConverter.toAst(msg.text || ""),
+      raw: msg,
+      author: {
+        userId: msg.sender?.name || "unknown",
+        userName: msg.sender?.displayName || "unknown",
+        fullName: msg.sender?.displayName || "unknown",
+        isBot: msgIsBot,
+        isMe: msgIsBot,
+      },
+      metadata: {
+        dateSent: msg.createTime ? new Date(msg.createTime) : new Date(),
+        edited: false,
+      },
+      attachments: [],
+    };
   }
 
   async fetchThread(threadId: string): Promise<ThreadInfo> {

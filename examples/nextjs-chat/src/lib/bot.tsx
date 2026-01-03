@@ -89,6 +89,7 @@ bot.onNewMention(async (thread, message) => {
           Say Hello
         </Button>
         <Button id="info">Show Info</Button>
+        <Button id="messages">Fetch Messages</Button>
         <Button id="goodbye" style="danger">
           Goodbye
         </Button>
@@ -124,6 +125,77 @@ bot.onAction("goodbye", async (event) => {
   await event.thread.post(
     `${emoji.wave} Goodbye, ${event.user.fullName}! See you later.`,
   );
+});
+
+// Demonstrate fetchMessages and allMessages
+bot.onAction("messages", async (event) => {
+  const { thread } = event;
+
+  try {
+    // 1. fetchMessages with backward direction (default) - gets most recent messages
+    const recentResult = await thread.adapter.fetchMessages(thread.id, {
+      limit: 5,
+      direction: "backward",
+    });
+
+    // 2. fetchMessages with forward direction - gets oldest messages first
+    const oldestResult = await thread.adapter.fetchMessages(thread.id, {
+      limit: 5,
+      direction: "forward",
+    });
+
+    // 3. allMessages iterator - iterate through all messages (uses forward direction)
+    const allMessages: string[] = [];
+    let count = 0;
+    for await (const msg of thread.allMessages) {
+      allMessages.push(
+        `${count + 1}. [${msg.author.userName}]: ${msg.text.slice(0, 30)}${msg.text.length > 30 ? "..." : ""}`,
+      );
+      count++;
+      if (count >= 10) break; // Limit to 10 for display
+    }
+
+    // Format results
+    const formatMessages = (msgs: typeof recentResult.messages) =>
+      msgs.length > 0
+        ? msgs
+            .map(
+              (m, i) =>
+                `${i + 1}. [${m.author.userName}]: ${m.text.slice(0, 30)}${m.text.length > 30 ? "..." : ""}`,
+            )
+            .join("\n")
+        : "(no messages)";
+
+    await thread.post(
+      <Card title={`${emoji.memo} Message Fetch Results`}>
+        <Section>
+          <Text>**fetchMessages (backward, limit: 5)**</Text>
+          <Text>Gets most recent messages, cursor points to older</Text>
+          <Text>{formatMessages(recentResult.messages)}</Text>
+          <Text>{`Next cursor: ${recentResult.nextCursor ? "yes" : "none"}`}</Text>
+        </Section>
+        <Divider />
+        <Section>
+          <Text>**fetchMessages (forward, limit: 5)**</Text>
+          <Text>Gets oldest messages first, cursor points to newer</Text>
+          <Text>{formatMessages(oldestResult.messages)}</Text>
+          <Text>{`Next cursor: ${oldestResult.nextCursor ? "yes" : "none"}`}</Text>
+        </Section>
+        <Divider />
+        <Section>
+          <Text>**allMessages iterator (first 10)**</Text>
+          <Text>Iterates from oldest to newest using forward direction</Text>
+          <Text>
+            {allMessages.length > 0 ? allMessages.join("\n") : "(no messages)"}
+          </Text>
+        </Section>
+      </Card>,
+    );
+  } catch (err) {
+    await thread.post(
+      `${emoji.warning} Error fetching messages: ${err instanceof Error ? err.message : "Unknown error"}`,
+    );
+  }
 });
 
 // Helper to delay execution

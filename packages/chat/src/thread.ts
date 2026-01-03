@@ -125,30 +125,26 @@ export class ThreadImpl<TState = Record<string, unknown>>
 
     return {
       async *[Symbol.asyncIterator]() {
-        let before: string | undefined;
-        let hasMore = true;
+        let cursor: string | undefined;
 
-        while (hasMore) {
-          const messages = await adapter.fetchMessages(threadId, {
+        while (true) {
+          // Use forward direction to iterate from oldest to newest
+          const result = await adapter.fetchMessages(threadId, {
             limit: 100,
-            before,
+            cursor,
+            direction: "forward",
           });
 
-          if (messages.length === 0) {
-            hasMore = false;
-            break;
-          }
-
-          for (const message of messages) {
+          for (const message of result.messages) {
             yield message;
           }
 
-          before = messages[messages.length - 1]?.id;
-
-          // If we got fewer than requested, we've reached the end
-          if (messages.length < 100) {
-            hasMore = false;
+          // No more pages if no nextCursor or no messages returned
+          if (!result.nextCursor || result.messages.length === 0) {
+            break;
           }
+
+          cursor = result.nextCursor;
         }
       },
     };
@@ -323,8 +319,8 @@ export class ThreadImpl<TState = Record<string, unknown>>
   }
 
   async refresh(): Promise<void> {
-    const messages = await this.adapter.fetchMessages(this.id, { limit: 50 });
-    this._recentMessages = messages;
+    const result = await this.adapter.fetchMessages(this.id, { limit: 50 });
+    this._recentMessages = result.messages;
   }
 
   mentionUser(userId: string): string {

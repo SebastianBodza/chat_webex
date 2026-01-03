@@ -1,6 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parseMarkdown } from "./markdown";
 import { ThreadImpl } from "./thread";
-import type { Adapter, FormattedContent, Lock, StateAdapter } from "./types";
+import type {
+  Adapter,
+  FormattedContent,
+  Lock,
+  Message,
+  StateAdapter,
+} from "./types";
+
+// Helper to create test messages
+function createTestMessage(id: string, text: string): Message {
+  return {
+    id,
+    threadId: "slack:C123:1234.5678",
+    text,
+    formatted: parseMarkdown(text),
+    raw: {},
+    author: {
+      userId: "U123",
+      userName: "user",
+      fullName: "Test User",
+      isBot: false,
+      isMe: false,
+    },
+    metadata: { dateSent: new Date(), edited: false },
+    attachments: [],
+  };
+}
 
 // Mock adapter
 function createMockAdapter(name = "slack"): Adapter {
@@ -19,7 +46,9 @@ function createMockAdapter(name = "slack"): Adapter {
     addReaction: vi.fn().mockResolvedValue(undefined),
     removeReaction: vi.fn().mockResolvedValue(undefined),
     startTyping: vi.fn().mockResolvedValue(undefined),
-    fetchMessages: vi.fn().mockResolvedValue([]),
+    fetchMessages: vi
+      .fn()
+      .mockResolvedValue({ messages: [], nextCursor: undefined }),
     fetchThread: vi
       .fn()
       .mockResolvedValue({ id: "t1", channelId: "c1", metadata: {} }),
@@ -388,6 +417,418 @@ describe("ThreadImpl", () => {
           recipientTeamId: "T123",
         }),
       );
+    });
+  });
+
+  describe("allMessages iterator", () => {
+    let thread: ThreadImpl;
+    let mockAdapter: Adapter;
+    let mockState: ReturnType<typeof createMockState>;
+
+    beforeEach(() => {
+      mockAdapter = createMockAdapter();
+      mockState = createMockState();
+
+      thread = new ThreadImpl({
+        id: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        channelId: "C123",
+        stateAdapter: mockState,
+      });
+    });
+
+    it("should iterate through all messages in chronological order", async () => {
+      const messages = [
+        createTestMessage("msg-1", "First message"),
+        createTestMessage("msg-2", "Second message"),
+        createTestMessage("msg-3", "Third message"),
+      ];
+
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages,
+          nextCursor: undefined,
+        },
+      );
+
+      const collected: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        collected.push(msg);
+      }
+
+      expect(collected).toHaveLength(3);
+      expect(collected[0].text).toBe("First message");
+      expect(collected[1].text).toBe("Second message");
+      expect(collected[2].text).toBe("Third message");
+    });
+
+    it("should use forward direction for pagination", async () => {
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: [],
+          nextCursor: undefined,
+        },
+      );
+
+      // Consume the iterator
+      for await (const _msg of thread.allMessages) {
+        // No messages
+      }
+
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledWith(
+        "slack:C123:1234.5678",
+        expect.objectContaining({
+          direction: "forward",
+          limit: 100,
+        }),
+      );
+    });
+
+    it("should handle pagination across multiple pages", async () => {
+      const page1 = [
+        createTestMessage("msg-1", "Page 1 - Message 1"),
+        createTestMessage("msg-2", "Page 1 - Message 2"),
+      ];
+      const page2 = [
+        createTestMessage("msg-3", "Page 2 - Message 1"),
+        createTestMessage("msg-4", "Page 2 - Message 2"),
+      ];
+      const page3 = [createTestMessage("msg-5", "Page 3 - Message 1")];
+
+      let callCount = 0;
+      (
+        mockAdapter.fetchMessages as ReturnType<typeof vi.fn>
+      ).mockImplementation(async (_threadId, options) => {
+        callCount++;
+        if (callCount === 1) {
+          expect(options?.cursor).toBeUndefined();
+          return { messages: page1, nextCursor: "cursor-1" };
+        }
+        if (callCount === 2) {
+          expect(options?.cursor).toBe("cursor-1");
+          return { messages: page2, nextCursor: "cursor-2" };
+        }
+        expect(options?.cursor).toBe("cursor-2");
+        return { messages: page3, nextCursor: undefined };
+      });
+
+      const collected: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        collected.push(msg);
+      }
+
+      expect(collected).toHaveLength(5);
+      expect(collected.map((m) => m.text)).toEqual([
+        "Page 1 - Message 1",
+        "Page 1 - Message 2",
+        "Page 2 - Message 1",
+        "Page 2 - Message 2",
+        "Page 3 - Message 1",
+      ]);
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(3);
+    });
+
+    it("should handle empty thread", async () => {
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: [],
+          nextCursor: undefined,
+        },
+      );
+
+      const collected: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        collected.push(msg);
+      }
+
+      expect(collected).toHaveLength(0);
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it("should stop when nextCursor is undefined", async () => {
+      const messages = [createTestMessage("msg-1", "Single message")];
+
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages,
+          nextCursor: undefined,
+        },
+      );
+
+      const collected: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        collected.push(msg);
+      }
+
+      expect(collected).toHaveLength(1);
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it("should stop when empty page is returned with cursor", async () => {
+      // Edge case: adapter returns a cursor but no messages (shouldn't happen, but be defensive)
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: [],
+          nextCursor: "some-cursor", // Cursor present but no messages
+        },
+      );
+
+      const collected: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        collected.push(msg);
+      }
+
+      expect(collected).toHaveLength(0);
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it("should allow breaking out of iteration early", async () => {
+      const page1 = [
+        createTestMessage("msg-1", "Message 1"),
+        createTestMessage("msg-2", "Message 2"),
+      ];
+
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: page1,
+          nextCursor: "more-available",
+        },
+      );
+
+      const collected: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        collected.push(msg);
+        if (msg.id === "msg-1") {
+          break; // Break after first message
+        }
+      }
+
+      expect(collected).toHaveLength(1);
+      expect(collected[0].id).toBe("msg-1");
+      // Should only fetch once since we broke early within first page
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it("should be reusable (can iterate multiple times)", async () => {
+      const messages = [createTestMessage("msg-1", "Test message")];
+
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages,
+          nextCursor: undefined,
+        },
+      );
+
+      // First iteration
+      const first: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        first.push(msg);
+      }
+
+      // Second iteration
+      const second: Message[] = [];
+      for await (const msg of thread.allMessages) {
+        second.push(msg);
+      }
+
+      expect(first).toHaveLength(1);
+      expect(second).toHaveLength(1);
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("refresh", () => {
+    let thread: ThreadImpl;
+    let mockAdapter: Adapter;
+    let mockState: ReturnType<typeof createMockState>;
+
+    beforeEach(() => {
+      mockAdapter = createMockAdapter();
+      mockState = createMockState();
+
+      thread = new ThreadImpl({
+        id: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        channelId: "C123",
+        stateAdapter: mockState,
+      });
+    });
+
+    it("should update recentMessages from API", async () => {
+      const messages = [
+        createTestMessage("msg-1", "Recent 1"),
+        createTestMessage("msg-2", "Recent 2"),
+      ];
+
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages,
+          nextCursor: undefined,
+        },
+      );
+
+      expect(thread.recentMessages).toHaveLength(0);
+
+      await thread.refresh();
+
+      expect(thread.recentMessages).toHaveLength(2);
+      expect(thread.recentMessages[0].text).toBe("Recent 1");
+      expect(thread.recentMessages[1].text).toBe("Recent 2");
+    });
+
+    it("should fetch with limit of 50", async () => {
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: [],
+          nextCursor: undefined,
+        },
+      );
+
+      await thread.refresh();
+
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledWith(
+        "slack:C123:1234.5678",
+        { limit: 50 },
+      );
+    });
+
+    it("should use default (backward) direction", async () => {
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: [],
+          nextCursor: undefined,
+        },
+      );
+
+      await thread.refresh();
+
+      // refresh() doesn't specify direction, so adapter uses its default (backward)
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledWith(
+        "slack:C123:1234.5678",
+        { limit: 50 },
+      );
+    });
+  });
+
+  describe("fetchMessages direction behavior", () => {
+    let thread: ThreadImpl;
+    let mockAdapter: Adapter;
+    let mockState: ReturnType<typeof createMockState>;
+
+    beforeEach(() => {
+      mockAdapter = createMockAdapter();
+      mockState = createMockState();
+
+      thread = new ThreadImpl({
+        id: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        channelId: "C123",
+        stateAdapter: mockState,
+      });
+    });
+
+    it("should pass direction option to adapter", async () => {
+      (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mockResolvedValue(
+        {
+          messages: [],
+          nextCursor: undefined,
+        },
+      );
+
+      // Test that allMessages passes forward direction
+      for await (const _msg of thread.allMessages) {
+        // No messages
+      }
+
+      const call = (mockAdapter.fetchMessages as ReturnType<typeof vi.fn>).mock
+        .calls[0];
+      expect(call[1]).toEqual(
+        expect.objectContaining({
+          direction: "forward",
+        }),
+      );
+    });
+  });
+
+  describe("concurrent iteration safety", () => {
+    let thread: ThreadImpl;
+    let mockAdapter: Adapter;
+    let mockState: ReturnType<typeof createMockState>;
+
+    beforeEach(() => {
+      mockAdapter = createMockAdapter();
+      mockState = createMockState();
+
+      thread = new ThreadImpl({
+        id: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        channelId: "C123",
+        stateAdapter: mockState,
+      });
+    });
+
+    it("should handle concurrent iterations independently", async () => {
+      let callCount = 0;
+      (
+        mockAdapter.fetchMessages as ReturnType<typeof vi.fn>
+      ).mockImplementation(async () => {
+        callCount++;
+        // Return different data for each call to prove independence
+        return {
+          messages: [
+            createTestMessage(`msg-${callCount}`, `Call ${callCount}`),
+          ],
+          nextCursor: undefined,
+        };
+      });
+
+      // Start two concurrent iterations
+      const results = await Promise.all([
+        (async () => {
+          const msgs: Message[] = [];
+          for await (const msg of thread.allMessages) {
+            msgs.push(msg);
+          }
+          return msgs;
+        })(),
+        (async () => {
+          const msgs: Message[] = [];
+          for await (const msg of thread.allMessages) {
+            msgs.push(msg);
+          }
+          return msgs;
+        })(),
+      ]);
+
+      // Each iteration should have its own messages
+      expect(results[0]).toHaveLength(1);
+      expect(results[1]).toHaveLength(1);
+      // They should have fetched independently
+      expect(mockAdapter.fetchMessages).toHaveBeenCalledTimes(2);
+    });
+
+    it("should not share cursor state between iterations", async () => {
+      const cursors: (string | undefined)[] = [];
+      (
+        mockAdapter.fetchMessages as ReturnType<typeof vi.fn>
+      ).mockImplementation(async (_threadId, options) => {
+        cursors.push(options?.cursor);
+        return {
+          messages: [createTestMessage("msg-1", "Test")],
+          nextCursor: undefined,
+        };
+      });
+
+      // Two sequential iterations
+      for await (const _msg of thread.allMessages) {
+        // Consume
+      }
+      for await (const _msg of thread.allMessages) {
+        // Consume
+      }
+
+      // Both iterations should start with undefined cursor
+      expect(cursors).toEqual([undefined, undefined]);
     });
   });
 });

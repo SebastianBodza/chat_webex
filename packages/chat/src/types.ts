@@ -174,11 +174,42 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
   /** Show typing indicator */
   startTyping(threadId: string): Promise<void>;
 
-  /** Fetch messages from a thread */
+  /**
+   * Fetch messages from a thread.
+   *
+   * **Direction behavior:**
+   * - `backward` (default): Fetches the most recent messages. Use this for loading
+   *   a chat view. The `nextCursor` points to older messages.
+   * - `forward`: Fetches the oldest messages first. Use this for iterating through
+   *   message history. The `nextCursor` points to newer messages.
+   *
+   * **Message ordering:**
+   * Messages within each page are always returned in chronological order (oldest first),
+   * regardless of direction. This is the natural reading order for chat messages.
+   *
+   * @example
+   * ```typescript
+   * // Load most recent 50 messages for display
+   * const recent = await adapter.fetchMessages(threadId, { limit: 50 });
+   * // recent.messages: [older, ..., newest] in chronological order
+   *
+   * // Paginate backward to load older messages
+   * const older = await adapter.fetchMessages(threadId, {
+   *   limit: 50,
+   *   cursor: recent.nextCursor,
+   * });
+   *
+   * // Iterate through all history from the beginning
+   * const history = await adapter.fetchMessages(threadId, {
+   *   limit: 100,
+   *   direction: 'forward',
+   * });
+   * ```
+   */
   fetchMessages(
     threadId: string,
     options?: FetchOptions,
-  ): Promise<Message<TRawMessage>[]>;
+  ): Promise<FetchResult<TRawMessage>>;
 
   /** Fetch thread metadata */
   fetchThread(threadId: string): Promise<ThreadInfo>;
@@ -423,7 +454,11 @@ export interface Thread<
   /** Recently fetched messages (cached) */
   recentMessages: Message<TRawMessage>[];
 
-  /** Async iterator for all messages in the thread */
+  /**
+   * Async iterator for all messages in the thread.
+   * Messages are yielded in chronological order (oldest first).
+   * Automatically handles pagination.
+   */
   allMessages: AsyncIterable<Message<TRawMessage>>;
 
   /**
@@ -529,13 +564,79 @@ export interface ThreadInfo {
   metadata: Record<string, unknown>;
 }
 
+/**
+ * Direction for fetching messages.
+ *
+ * - `backward`: Fetch most recent messages first. Pagination moves toward older messages.
+ *   This is the default, suitable for loading a chat view (show latest messages first).
+ *
+ * - `forward`: Fetch oldest messages first. Pagination moves toward newer messages.
+ *   Suitable for iterating through message history from the beginning.
+ *
+ * In both directions, messages within each page are returned in chronological order
+ * (oldest first), which is the natural reading order for chat messages.
+ *
+ * @example
+ * ```typescript
+ * // Load most recent 50 messages (default)
+ * const recent = await adapter.fetchMessages(threadId, { limit: 50 });
+ * // recent.messages: [older, ..., newest] (chronological within page)
+ * // recent.nextCursor: points to older messages
+ *
+ * // Iterate through all history from beginning
+ * const history = await adapter.fetchMessages(threadId, {
+ *   limit: 50,
+ *   direction: 'forward',
+ * });
+ * // history.messages: [oldest, ..., newer] (chronological within page)
+ * // history.nextCursor: points to even newer messages
+ * ```
+ */
+export type FetchDirection = "forward" | "backward";
+
+/**
+ * Options for fetching messages from a thread.
+ */
 export interface FetchOptions {
-  /** Maximum number of messages to fetch */
+  /** Maximum number of messages to fetch. Default varies by adapter (50-100). */
   limit?: number;
-  /** Fetch messages before this message ID */
-  before?: string;
-  /** Fetch messages after this message ID */
-  after?: string;
+  /**
+   * Pagination cursor for fetching the next page of messages.
+   * Pass the `nextCursor` from a previous `FetchResult`.
+   */
+  cursor?: string;
+  /**
+   * Direction to fetch messages.
+   *
+   * - `backward` (default): Fetch most recent messages. Cursor moves to older messages.
+   * - `forward`: Fetch oldest messages. Cursor moves to newer messages.
+   *
+   * Messages within each page are always returned in chronological order (oldest first).
+   */
+  direction?: FetchDirection;
+}
+
+/**
+ * Result of fetching messages from a thread.
+ */
+export interface FetchResult<TRawMessage = unknown> {
+  /**
+   * Messages in chronological order (oldest first within this page).
+   *
+   * For `direction: 'backward'` (default): These are the N most recent messages.
+   * For `direction: 'forward'`: These are the N oldest messages (or next N after cursor).
+   */
+  messages: Message<TRawMessage>[];
+  /**
+   * Cursor for fetching the next page.
+   * Pass this as `cursor` in the next `fetchMessages` call.
+   *
+   * - For `direction: 'backward'`: Points to older messages.
+   * - For `direction: 'forward'`: Points to newer messages.
+   *
+   * Undefined if there are no more messages in that direction.
+   */
+  nextCursor?: string;
 }
 
 // =============================================================================

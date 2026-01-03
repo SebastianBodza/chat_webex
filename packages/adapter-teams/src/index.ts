@@ -31,6 +31,7 @@ import type {
   ChatInstance,
   EmojiValue,
   FetchOptions,
+  FetchResult,
   FileUpload,
   FormattedContent,
   Logger,
@@ -936,7 +937,7 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
   async fetchMessages(
     threadId: string,
     options: FetchOptions = {},
-  ): Promise<Message<unknown>[]> {
+  ): Promise<FetchResult<unknown>> {
     if (!this.graphClient) {
       throw new NotImplementedError(
         "Teams fetchMessages requires appTenantId to be configured for Microsoft Graph API access.",
@@ -946,11 +947,15 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
     const { conversationId } = this.decodeThreadId(threadId);
     const limit = options.limit || 50;
+    const cursor = options.cursor;
+    const direction = options.direction ?? "backward";
 
     try {
       this.logger?.debug("Teams Graph API: fetching messages", {
         conversationId,
         limit,
+        cursor,
+        direction,
       });
 
       // Teams conversation IDs:
@@ -959,19 +964,40 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       // - 1:1 chats: other formats (e.g., "a]xxx", "8:orgid:xxx")
       // For Graph API, we use /chats/{chat-id}/messages for all chat types
 
-      const response = await this.graphClient
+      let request = this.graphClient
         .api(`/chats/${encodeURIComponent(conversationId)}/messages`)
-        .top(limit)
-        .orderby("createdDateTime desc")
-        .get();
+        .top(limit);
 
-      const graphMessages = response.value || [];
+      if (direction === "forward") {
+        // Forward: oldest first, cursor moves to newer messages
+        request = request.orderby("createdDateTime asc");
+        if (cursor) {
+          request = request.filter(`createdDateTime gt ${cursor}`);
+        }
+      } else {
+        // Backward: newest first (API order), cursor moves to older messages
+        request = request.orderby("createdDateTime desc");
+        if (cursor) {
+          request = request.filter(`createdDateTime lt ${cursor}`);
+        }
+      }
+
+      const response = await request.get();
+
+      let graphMessages = (response.value || []) as GraphChatMessage[];
+
+      // For backward direction, API returns newest first, but we want
+      // chronological order within the page, so reverse
+      if (direction === "backward") {
+        graphMessages = graphMessages.reverse();
+      }
 
       this.logger?.debug("Teams Graph API: fetched messages", {
         count: graphMessages.length,
+        direction,
       });
 
-      return graphMessages.map((msg: GraphChatMessage) => {
+      const messages = graphMessages.map((msg: GraphChatMessage) => {
         const isFromBot =
           msg.from?.application?.id === this.config.appId ||
           msg.from?.user?.id === this.config.appId;
@@ -1007,6 +1033,27 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
           attachments: this.extractAttachmentsFromGraphMessage(msg),
         };
       });
+
+      // Determine nextCursor based on direction
+      // Only set nextCursor if we got a full page (might be more)
+      let nextCursor: string | undefined;
+      if (graphMessages.length >= limit) {
+        if (direction === "forward") {
+          // Forward: use the newest message's timestamp (last in array after asc sort)
+          const lastMsg = graphMessages[graphMessages.length - 1];
+          if (lastMsg?.createdDateTime) {
+            nextCursor = lastMsg.createdDateTime;
+          }
+        } else {
+          // Backward: use the oldest message's timestamp (first in array after reverse)
+          const oldestMsg = graphMessages[0];
+          if (oldestMsg?.createdDateTime) {
+            nextCursor = oldestMsg.createdDateTime;
+          }
+        }
+      }
+
+      return { messages, nextCursor };
     } catch (error) {
       this.logger?.error("Teams Graph API: fetchMessages error", { error });
 
