@@ -234,12 +234,18 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
 
       // Cache team/channel context for proper message fetching in channel threads
       // This allows fetchMessages to use the channel-specific endpoint for thread filtering
-      if (channelData?.team?.id && channelData?.channel?.id && tenantId) {
+      // The Graph API requires aadGroupId (GUID format), not the Teams thread-style ID
+      // Note: The botbuilder types don't include aadGroupId, but it's present at runtime
+      const team = channelData?.team as
+        | { id?: string; aadGroupId?: string }
+        | undefined;
+      const teamAadGroupId = team?.aadGroupId;
+      if (teamAadGroupId && channelData?.channel?.id && tenantId) {
         const conversationId = activity.conversation?.id || "";
         // Extract the base channel ID (without ;messageid=) for mapping
         const baseChannelId = conversationId.replace(/;messageid=\d+/, "");
         const context: TeamsChannelContext = {
-          teamId: channelData.team.id,
+          teamId: teamAadGroupId, // Use aadGroupId (GUID) for Graph API
           channelId: channelData.channel.id,
           tenantId,
         };
