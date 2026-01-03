@@ -236,31 +236,66 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       // This allows fetchMessages to use the channel-specific endpoint for thread filtering
       // The Graph API requires aadGroupId (GUID format), not the Teams thread-style ID
       // Note: The botbuilder types don't include aadGroupId, but it's present at runtime
+      // aadGroupId is only available in installationUpdate/conversationUpdate events
       const team = channelData?.team as
         | { id?: string; aadGroupId?: string }
         | undefined;
       const teamAadGroupId = team?.aadGroupId;
+      const teamThreadId = team?.id; // Thread-style ID like "19:xxx@thread.tacv2"
+      const conversationId = activity.conversation?.id || "";
+      const baseChannelId = conversationId.replace(/;messageid=\d+/, "");
+
       if (teamAadGroupId && channelData?.channel?.id && tenantId) {
-        const conversationId = activity.conversation?.id || "";
-        // Extract the base channel ID (without ;messageid=) for mapping
-        const baseChannelId = conversationId.replace(/;messageid=\d+/, "");
+        // We have aadGroupId (from installationUpdate/conversationUpdate) - cache it
         const context: TeamsChannelContext = {
           teamId: teamAadGroupId, // Use aadGroupId (GUID) for Graph API
           channelId: channelData.channel.id,
           tenantId,
         };
+        const contextJson = JSON.stringify(context);
+
+        // Cache by conversation ID (channel)
         this.chat
           .getState()
-          .set(
-            `teams:channelContext:${baseChannelId}`,
-            JSON.stringify(context),
-            ttl,
-          );
+          .set(`teams:channelContext:${baseChannelId}`, contextJson, ttl);
+
+        // Also cache by team thread-style ID for lookup from regular messages
+        // (which don't have aadGroupId but do have team.id)
+        if (teamThreadId) {
+          this.chat
+            .getState()
+            .set(`teams:teamContext:${teamThreadId}`, contextJson, ttl);
+        }
+
         this.logger?.debug("Cached Teams channel context", {
           conversationId: baseChannelId,
+          teamThreadId,
           teamId: context.teamId,
           channelId: context.channelId,
         });
+      } else if (teamThreadId && channelData?.channel?.id && tenantId) {
+        // Regular message event - no aadGroupId, but try to look up from previous cache
+        const cachedTeamContext = await this.chat
+          .getState()
+          .get<string>(`teams:teamContext:${teamThreadId}`);
+
+        if (cachedTeamContext) {
+          // Found cached context from installation event - also cache by channel ID
+          this.chat
+            .getState()
+            .set(
+              `teams:channelContext:${baseChannelId}`,
+              cachedTeamContext,
+              ttl,
+            );
+          this.logger?.debug(
+            "Propagated Teams channel context from team cache",
+            {
+              conversationId: baseChannelId,
+              teamThreadId,
+            },
+          );
+        }
       }
     }
 
@@ -551,7 +586,11 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       attachments: (activity.attachments || [])
         .filter(
           (att) =>
-            att.contentType !== "application/vnd.microsoft.card.adaptive",
+            // Filter out adaptive cards (handled separately)
+            att.contentType !== "application/vnd.microsoft.card.adaptive" &&
+            // Filter out text/html - this is just the formatted version of the message text,
+            // not an actual file attachment
+            att.contentType !== "text/html",
         )
         .map((att) => this.createAttachment(att)),
     };

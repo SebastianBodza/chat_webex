@@ -121,6 +121,38 @@ Production webhook interactions can be recorded and converted into replay tests:
 
 See `packages/integration-tests/fixtures/replay/README.md` for detailed workflow.
 
+### Downloading and Analyzing Recordings
+
+When debugging production issues, download recordings for the current git SHA:
+
+```bash
+cd examples/nextjs-chat
+
+# Get current SHA
+git rev-parse HEAD
+
+# List all recording sessions (look for sessions starting with your SHA)
+pnpm recording:list
+
+# Export a specific session to a file
+pnpm recording:export session-<SHA>-<timestamp>-<random> 2>&1 | \
+  grep -v "^>" | grep -v "^\[dotenv" | grep -v "^$" > /tmp/recording.json
+
+# View number of entries
+cat /tmp/recording.json | jq 'length'
+
+# Group webhooks by platform
+cat /tmp/recording.json | jq '[.[] | select(.type == "webhook")] | group_by(.platform) | .[] | {platform: .[0].platform, count: length}'
+
+# Extract and analyze platform-specific webhooks
+cat /tmp/recording.json | jq '[.[] | select(.type == "webhook" and .platform == "teams") | .body | fromjson]' > /tmp/teams-webhooks.json
+cat /tmp/recording.json | jq '[.[] | select(.type == "webhook" and .platform == "slack") | .body | fromjson]' > /tmp/slack-webhooks.json
+cat /tmp/recording.json | jq '[.[] | select(.type == "webhook" and .platform == "gchat") | .body | fromjson]' > /tmp/gchat-webhooks.json
+
+# Inspect specific webhook fields (e.g., Teams channelData)
+cat /tmp/teams-webhooks.json | jq '[.[] | {type, text, channelData, value}]'
+```
+
 ## Environment Variables
 
 Key env vars used (see `turbo.json` for full list):
