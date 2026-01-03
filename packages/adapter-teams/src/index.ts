@@ -964,37 +964,53 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       // - 1:1 chats: other formats (e.g., "a]xxx", "8:orgid:xxx")
       // For Graph API, we use /chats/{chat-id}/messages for all chat types
 
+      // Note: Teams Graph API only supports orderby("createdDateTime desc")
+      // Ascending order is not supported, so we work around this limitation
       let request = this.graphClient
         .api(`/chats/${encodeURIComponent(conversationId)}/messages`)
-        .top(limit);
+        .top(direction === "forward" ? 1000 : limit) // Fetch more for forward to find oldest
+        .orderby("createdDateTime desc"); // Only desc is supported
 
-      if (direction === "forward") {
-        // Forward: oldest first, cursor moves to newer messages
-        request = request.orderby("createdDateTime asc");
-        if (cursor) {
-          request = request.filter(`createdDateTime gt ${cursor}`);
-        }
-      } else {
-        // Backward: newest first (API order), cursor moves to older messages
-        request = request.orderby("createdDateTime desc");
-        if (cursor) {
-          request = request.filter(`createdDateTime lt ${cursor}`);
-        }
+      if (direction === "backward" && cursor) {
+        // Backward with cursor: get messages older than cursor
+        request = request.filter(`createdDateTime lt ${cursor}`);
       }
+      // For forward direction, we fetch all and slice (no filter supported for gt with desc order)
 
       const response = await request.get();
 
       let graphMessages = (response.value || []) as GraphChatMessage[];
 
-      // For backward direction, API returns newest first, but we want
-      // chronological order within the page, so reverse
-      if (direction === "backward") {
-        graphMessages = graphMessages.reverse();
+      // API returns newest first, always reverse to get chronological order
+      graphMessages = graphMessages.reverse();
+
+      // Track whether there are more messages for cursor calculation
+      let hasMoreMessages = false;
+
+      if (direction === "forward") {
+        // Forward: we want oldest messages first
+        // Find starting position based on cursor (cursor is a timestamp)
+        let startIndex = 0;
+        if (cursor) {
+          // Find first message after the cursor timestamp
+          startIndex = graphMessages.findIndex(
+            (msg) => msg.createdDateTime && msg.createdDateTime > cursor,
+          );
+          if (startIndex === -1) startIndex = graphMessages.length;
+        }
+        // Check if there are more messages beyond our slice
+        hasMoreMessages = startIndex + limit < graphMessages.length;
+        // Take only the requested limit
+        graphMessages = graphMessages.slice(startIndex, startIndex + limit);
+      } else {
+        // Backward: we got a full page if we got the requested limit
+        hasMoreMessages = graphMessages.length >= limit;
       }
 
       this.logger?.debug("Teams Graph API: fetched messages", {
         count: graphMessages.length,
         direction,
+        hasMoreMessages,
       });
 
       const messages = graphMessages.map((msg: GraphChatMessage) => {
@@ -1035,17 +1051,16 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       });
 
       // Determine nextCursor based on direction
-      // Only set nextCursor if we got a full page (might be more)
       let nextCursor: string | undefined;
-      if (graphMessages.length >= limit) {
+      if (hasMoreMessages && graphMessages.length > 0) {
         if (direction === "forward") {
-          // Forward: use the newest message's timestamp (last in array after asc sort)
+          // Forward: use the newest message's timestamp (last in returned slice)
           const lastMsg = graphMessages[graphMessages.length - 1];
           if (lastMsg?.createdDateTime) {
             nextCursor = lastMsg.createdDateTime;
           }
         } else {
-          // Backward: use the oldest message's timestamp (first in array after reverse)
+          // Backward: use the oldest message's timestamp (first in returned array)
           const oldestMsg = graphMessages[0];
           if (oldestMsg?.createdDateTime) {
             nextCursor = oldestMsg.createdDateTime;

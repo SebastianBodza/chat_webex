@@ -258,6 +258,8 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
   private impersonatedChatApi?: chat_v1.Chat;
   /** HTTP endpoint URL for button click actions */
   private endpointUrl?: string;
+  /** In-memory user info cache for fast lookups */
+  private userInfoCache = new Map<string, CachedUserInfo>();
 
   constructor(config: GoogleChatAdapterConfig) {
     this.userName = config.userName || "bot";
@@ -1644,8 +1646,10 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       hasNextPageToken: !!response.data.nextPageToken,
     });
 
-    const messages = rawMessages.map((msg) =>
-      this.parseGChatListMessage(msg, spaceName, threadId),
+    const messages = await Promise.all(
+      rawMessages.map((msg) =>
+        this.parseGChatListMessage(msg, spaceName, threadId),
+      ),
     );
 
     return {
@@ -1726,8 +1730,10 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       startIndex + limit,
     );
 
-    const messages = selectedMessages.map((msg) =>
-      this.parseGChatListMessage(msg, spaceName, threadId),
+    const messages = await Promise.all(
+      selectedMessages.map((msg) =>
+        this.parseGChatListMessage(msg, spaceName, threadId),
+      ),
     );
 
     // Determine nextCursor - use message name of last returned message
@@ -1750,17 +1756,29 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
 
   /**
    * Parse a message from the list API into the standard Message format.
+   * Resolves user display names and properly determines isMe.
    */
-  private parseGChatListMessage(
+  private async parseGChatListMessage(
     msg: chat_v1.Schema$Message,
     spaceName: string,
     threadId: string,
-  ) {
+  ): Promise<Message<unknown>> {
     const msgThreadId = this.encodeThreadId({
       spaceName,
       threadName: msg.thread?.name ?? undefined,
     });
     const msgIsBot = msg.sender?.type === "BOT";
+
+    // Resolve display name - the list API may not include it
+    const userId = msg.sender?.name || "unknown";
+    const displayName = await this.resolveUserDisplayName(
+      userId,
+      msg.sender?.displayName ?? undefined,
+    );
+
+    // Use isMessageFromSelf for proper isMe determination
+    const isMe = this.isMessageFromSelf(msg as GoogleChatMessage);
+
     return {
       id: msg.name || "",
       threadId: msgThreadId,
@@ -1768,11 +1786,11 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       formatted: this.formatConverter.toAst(msg.text || ""),
       raw: msg,
       author: {
-        userId: msg.sender?.name || "unknown",
-        userName: msg.sender?.displayName || "unknown",
-        fullName: msg.sender?.displayName || "unknown",
+        userId,
+        userName: displayName,
+        fullName: displayName,
         isBot: msgIsBot,
-        isMe: msgIsBot,
+        isMe,
       },
       metadata: {
         dateSent: msg.createTime ? new Date(msg.createTime) : new Date(),
@@ -1965,26 +1983,48 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     displayName: string,
     email?: string,
   ): Promise<void> {
-    if (!this.state || !displayName || displayName === "unknown") return;
+    if (!displayName || displayName === "unknown") return;
 
-    const cacheKey = `${USER_INFO_KEY_PREFIX}${userId}`;
-    await this.state.set<CachedUserInfo>(
-      cacheKey,
-      { displayName, email },
-      USER_INFO_CACHE_TTL_MS,
-    );
+    const userInfo: CachedUserInfo = { displayName, email };
+
+    // Always update in-memory cache
+    this.userInfoCache.set(userId, userInfo);
+
+    // Also persist to state adapter if available
+    if (this.state) {
+      const cacheKey = `${USER_INFO_KEY_PREFIX}${userId}`;
+      await this.state.set<CachedUserInfo>(
+        cacheKey,
+        userInfo,
+        USER_INFO_CACHE_TTL_MS,
+      );
+    }
   }
 
   /**
-   * Get cached user info.
+   * Get cached user info. Checks in-memory cache first, then falls back to state adapter.
    */
   private async getCachedUserInfo(
     userId: string,
   ): Promise<CachedUserInfo | null> {
+    // Check in-memory cache first (fast path)
+    const inMemory = this.userInfoCache.get(userId);
+    if (inMemory) {
+      return inMemory;
+    }
+
+    // Fall back to state adapter
     if (!this.state) return null;
 
     const cacheKey = `${USER_INFO_KEY_PREFIX}${userId}`;
-    return this.state.get<CachedUserInfo>(cacheKey);
+    const fromState = await this.state.get<CachedUserInfo>(cacheKey);
+
+    // Populate in-memory cache if found in state
+    if (fromState) {
+      this.userInfoCache.set(userId, fromState);
+    }
+
+    return fromState;
   }
 
   /**
