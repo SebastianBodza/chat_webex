@@ -348,6 +348,42 @@ export const TEAMS_SERVICE_URL =
 export const TEAMS_BOT_APP_ID = "57627569-c120-42a1-9e6f-7cb4b96cc8ef";
 export const TEAMS_HUMAN_USER_ID = "7a9b12a6-4f02-43f1-b6f9-fd10e047f903";
 
+// Parent message that started the thread (fetched separately from /teams/.../messages/{id})
+// This is the message the bot was @mentioned in, starting the conversation
+export const TEAMS_PARENT_MESSAGE = {
+  id: TEAMS_PARENT_MESSAGE_ID,
+  createdDateTime: "2026-01-03T20:03:14.930Z",
+  from: {
+    application: null,
+    device: null,
+    user: {
+      "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+      id: TEAMS_HUMAN_USER_ID,
+      displayName: "Malte Ubl",
+      userIdentityType: "aadUser",
+      tenantId: "ed6e6740-934d-4088-a05e-caa14d8d89ee",
+    },
+  },
+  body: {
+    contentType: "html",
+    content: '<p><at id="0">Chat SDK Demo</at> Hey</p>',
+  },
+  attachments: [],
+  mentions: [
+    {
+      id: 0,
+      mentionText: "Chat SDK Demo",
+      mentioned: {
+        application: {
+          id: TEAMS_BOT_APP_ID,
+          displayName: "Chat SDK Demo",
+          applicationIdentityType: "bot",
+        },
+      },
+    },
+  ],
+};
+
 // Raw Teams messages as returned by the Graph API (/teams/.../channels/.../messages/.../replies)
 // Extracted from recording session-143af459f40cfcad1098f0b7117a6ac7cb5d85a6
 // Sorted oldest to newest (by createdDateTime) - Graph API returns newest first, so tests must reverse

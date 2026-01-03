@@ -26,6 +26,7 @@ import {
   TEAMS_BOT_APP_ID,
   TEAMS_CHANNEL_ID,
   TEAMS_HUMAN_USER_ID,
+  TEAMS_PARENT_MESSAGE,
   TEAMS_PARENT_MESSAGE_ID,
   TEAMS_RAW_MESSAGES,
   TEAMS_SERVICE_URL,
@@ -460,6 +461,10 @@ describe("fetchMessages Replay Tests", () => {
       // Connect the state adapter before using it
       await ctx.chat.getState().connect();
 
+      // Initialize the adapter so it has access to the chat instance
+      // (required for channel context lookup in fetchMessages)
+      await ctx.adapter.initialize(ctx.chat);
+
       // Set up channel context in state so fetchMessages can find team/channel info
       const channelContext = {
         teamId: TEAMS_TEAM_ID,
@@ -474,8 +479,10 @@ describe("fetchMessages Replay Tests", () => {
         );
 
       // Mock Graph API to return actual recorded messages
-      // Note: Graph API returns newest first (desc order), so we reverse the fixture
+      // First response: parent message (single object, not paginated)
+      // Second response: replies (Graph API returns newest first, so we reverse)
       mockGraphClient.setResponses([
+        TEAMS_PARENT_MESSAGE as unknown as Record<string, unknown>,
         { value: [...(TEAMS_RAW_MESSAGES as unknown[])].reverse() },
       ]);
     });
@@ -484,17 +491,28 @@ describe("fetchMessages Replay Tests", () => {
       await ctx.chat.shutdown();
     });
 
-    it("should call Graph API with correct endpoint", async () => {
+    it("should call Graph API with correct endpoints for parent and replies", async () => {
       await ctx.adapter.fetchMessages(TEAMS_THREAD_ID, {
         limit: 25,
         direction: "backward",
       });
 
-      // Verify an API call was made
-      expect(mockGraphClient.apiCalls.length).toBeGreaterThan(0);
-      // Uses chats endpoint (channel context requires webhook handling to populate)
-      expect(mockGraphClient.apiCalls[0].url).toContain("/chats/");
-      expect(mockGraphClient.apiCalls[0].url).toContain("/messages");
+      // Verify TWO API calls were made: one for parent, one for replies
+      expect(mockGraphClient.apiCalls.length).toBe(2);
+
+      // First call: fetch parent message
+      expect(mockGraphClient.apiCalls[0].url).toContain("/teams/");
+      expect(mockGraphClient.apiCalls[0].url).toContain("/channels/");
+      expect(mockGraphClient.apiCalls[0].url).toContain(
+        `/messages/${TEAMS_PARENT_MESSAGE_ID}`,
+      );
+      // Should NOT end with /replies (that's the second call)
+      expect(mockGraphClient.apiCalls[0].url).not.toMatch(/\/replies$/);
+
+      // Second call: fetch replies
+      expect(mockGraphClient.apiCalls[1].url).toContain("/teams/");
+      expect(mockGraphClient.apiCalls[1].url).toContain("/channels/");
+      expect(mockGraphClient.apiCalls[1].url).toMatch(/\/replies$/);
     });
 
     it("should return all messages in chronological order", async () => {
@@ -503,11 +521,15 @@ describe("fetchMessages Replay Tests", () => {
         direction: "backward",
       });
 
-      // Should have all 20 messages from the fixture
-      expect(result.messages).toHaveLength(20);
+      // Should have all 21 messages: 1 parent + 20 replies
+      expect(result.messages).toHaveLength(21);
+
+      // First message should be the parent (the @mention that started the thread)
+      expect(result.messages[0].text).toContain("Hey");
+      expect(result.messages[0].author.isBot).toBe(false);
 
       // Extract just the numbered messages (filter out bot card messages)
-      // Note: Recording has numbers 1-13 (no "Hey" or "14" as those are parent/missing)
+      // Note: Recording has numbers 1-13 (no "14" in this recording)
       const expectedNumbers = [
         "1",
         "2",
@@ -541,7 +563,12 @@ describe("fetchMessages Replay Tests", () => {
         direction: "forward",
       });
 
-      expect(result.messages).toHaveLength(20);
+      // Should have all 21 messages: 1 parent + 20 replies
+      expect(result.messages).toHaveLength(21);
+
+      // First message should be the parent (forward = oldest first)
+      expect(result.messages[0].text).toContain("Hey");
+      expect(result.messages[0].author.isBot).toBe(false);
 
       // Extract numbered messages and verify order
       const expectedNumbers = [
@@ -576,8 +603,8 @@ describe("fetchMessages Replay Tests", () => {
 
       // 6 bot messages (2 welcome/fetch cards, 4 "Thanks")
       expect(botMessages).toHaveLength(6);
-      // 14 human messages (numbered 1-13 + "Proper text")
-      expect(humanMessages).toHaveLength(14);
+      // 15 human messages (parent "Hey" + numbered 1-13 + "Proper text")
+      expect(humanMessages).toHaveLength(15);
 
       // All bot messages should have isMe: true
       for (const msg of botMessages) {
@@ -948,6 +975,10 @@ describe("allMessages Replay Tests", () => {
       // Connect the state adapter before using it
       await ctx.chat.getState().connect();
 
+      // Initialize the adapter so it has access to the chat instance
+      // (required for channel context lookup in fetchMessages)
+      await ctx.adapter.initialize(ctx.chat);
+
       // Set up channel context in state
       const channelContext = {
         teamId: TEAMS_TEAM_ID,
@@ -962,8 +993,10 @@ describe("allMessages Replay Tests", () => {
         );
 
       // Mock Graph API to return actual recorded messages
-      // Note: Graph API returns newest first (desc order), so we reverse the fixture
+      // First response: parent message (single object, not paginated)
+      // Second response: replies (Graph API returns newest first, so we reverse)
       mockGraphClient.setResponses([
+        TEAMS_PARENT_MESSAGE as unknown as Record<string, unknown>,
         { value: [...(TEAMS_RAW_MESSAGES as unknown[])].reverse() },
       ]);
     });
@@ -987,8 +1020,12 @@ describe("allMessages Replay Tests", () => {
         messages.push(msg);
       }
 
-      // Should have all 20 messages
-      expect(messages).toHaveLength(20);
+      // Should have all 21 messages: 1 parent + 20 replies
+      expect(messages).toHaveLength(21);
+
+      // First message should be the parent (the @mention that started the thread)
+      expect(messages[0].text).toContain("Hey");
+      expect(messages[0].author.isBot).toBe(false);
 
       // Extract numbered messages and verify chronological order (1-13 in this recording)
       const expectedNumbers = [

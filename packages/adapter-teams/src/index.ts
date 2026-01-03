@@ -1310,9 +1310,29 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       direction,
     });
 
-    // Build the endpoint URL:
-    // /teams/{team-id}/channels/{channel-id}/messages/{message-id}/replies
-    const apiUrl = `/teams/${encodeURIComponent(context.teamId)}/channels/${encodeURIComponent(context.channelId)}/messages/${encodeURIComponent(threadMessageId)}/replies`;
+    // Build the endpoint URLs:
+    // Parent message: /teams/{team-id}/channels/{channel-id}/messages/{message-id}
+    // Replies: /teams/{team-id}/channels/{channel-id}/messages/{message-id}/replies
+    const parentUrl = `/teams/${encodeURIComponent(context.teamId)}/channels/${encodeURIComponent(context.channelId)}/messages/${encodeURIComponent(threadMessageId)}`;
+    const repliesUrl = `${parentUrl}/replies`;
+
+    const graphClient = this.graphClient;
+    if (!graphClient) {
+      throw new Error("Graph client not initialized");
+    }
+
+    // Fetch the parent message (the original message that started the thread)
+    let parentMessage: GraphChatMessage | null = null;
+    try {
+      parentMessage = (await graphClient
+        .api(parentUrl)
+        .get()) as GraphChatMessage;
+    } catch (err) {
+      this.logger?.warn("Failed to fetch parent message", {
+        threadMessageId,
+        err,
+      });
+    }
 
     let graphMessages: GraphChatMessage[];
     let hasMoreMessages = false;
@@ -1320,26 +1340,27 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     if (direction === "forward") {
       // Forward direction: fetch all replies and paginate in chronological order (oldest first)
       // Graph API returns messages in descending order (newest first), so we must reverse
-      const allMessages: GraphChatMessage[] = [];
+      const allReplies: GraphChatMessage[] = [];
       let nextLink: string | undefined;
-      const graphClient = this.graphClient;
-      if (!graphClient) {
-        throw new Error("Graph client not initialized");
-      }
 
       do {
         const request = nextLink
           ? graphClient.api(nextLink)
-          : graphClient.api(apiUrl).top(50);
+          : graphClient.api(repliesUrl).top(50);
 
         const response = await request.get();
         const pageMessages = (response.value || []) as GraphChatMessage[];
-        allMessages.push(...pageMessages);
+        allReplies.push(...pageMessages);
         nextLink = response["@odata.nextLink"];
       } while (nextLink);
 
-      // Reverse to get chronological order (oldest first)
-      allMessages.reverse();
+      // Reverse replies to get chronological order (oldest first)
+      allReplies.reverse();
+
+      // Prepend parent message (it's the oldest - started the thread)
+      const allMessages = parentMessage
+        ? [parentMessage, ...allReplies]
+        : allReplies;
 
       // Find starting position based on cursor
       let startIndex = 0;
@@ -1355,27 +1376,27 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
     } else {
       // Backward direction: return most recent messages in chronological order
       // Graph API returns messages in descending order (newest first)
-      const allMessages: GraphChatMessage[] = [];
+      const allReplies: GraphChatMessage[] = [];
       let nextLink: string | undefined;
-      const graphClient = this.graphClient;
-      if (!graphClient) {
-        throw new Error("Graph client not initialized");
-      }
 
       do {
         const request = nextLink
           ? graphClient.api(nextLink)
-          : graphClient.api(apiUrl).top(50);
+          : graphClient.api(repliesUrl).top(50);
 
         const response = await request.get();
         const pageMessages = (response.value || []) as GraphChatMessage[];
-        allMessages.push(...pageMessages);
+        allReplies.push(...pageMessages);
         nextLink = response["@odata.nextLink"];
       } while (nextLink);
 
-      // For backward, we want the most recent messages but in chronological order
-      // allMessages is newest first, so we reverse to get chronological
-      allMessages.reverse();
+      // Reverse replies to get chronological order (oldest first)
+      allReplies.reverse();
+
+      // Prepend parent message (it's the oldest - started the thread)
+      const allMessages = parentMessage
+        ? [parentMessage, ...allReplies]
+        : allReplies;
 
       if (cursor) {
         // Find position of cursor (cursor is timestamp of the oldest message in previous batch)

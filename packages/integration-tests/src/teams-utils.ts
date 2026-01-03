@@ -246,11 +246,18 @@ export const DEFAULT_TEAMS_SERVICE_URL =
   "https://smba.trafficmanager.net/teams/";
 
 /**
+ * Response type for mock Graph client
+ * Can be either a paginated response with `value` array, or a single object
+ */
+export type MockGraphResponse =
+  | { value: unknown[]; "@odata.nextLink"?: string }
+  | Record<string, unknown>;
+
+/**
  * Create a mock Microsoft Graph client for testing fetchMessages
  */
 export function createMockGraphClient() {
-  let mockResponses: Array<{ value: unknown[]; "@odata.nextLink"?: string }> =
-    [];
+  let mockResponses: MockGraphResponse[] = [];
   let callIndex = 0;
   let currentTop: number | undefined;
   const apiCalls: Array<{ url: string; top?: number }> = [];
@@ -266,8 +273,8 @@ export function createMockGraphClient() {
     get: vi.fn(async () => {
       const response = mockResponses[callIndex] || { value: [] };
       callIndex++;
-      // Respect the top() limit if set
-      if (currentTop && response.value) {
+      // Respect the top() limit if set (only for paginated responses with value array)
+      if (currentTop && "value" in response && Array.isArray(response.value)) {
         return {
           ...response,
           value: response.value.slice(0, currentTop),
@@ -289,9 +296,7 @@ export function createMockGraphClient() {
     client: mockClient,
     apiCalls,
     mockRequest,
-    setResponses: (
-      responses: Array<{ value: unknown[]; "@odata.nextLink"?: string }>,
-    ) => {
+    setResponses: (responses: MockGraphResponse[]) => {
       mockResponses = responses;
       callIndex = 0;
     },
