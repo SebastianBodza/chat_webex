@@ -1,3 +1,27 @@
+# Contributing
+
+## Preview Branch Testing
+
+The example app includes a middleware that can proxy webhook requests to a preview branch deployment. This allows testing preview branches with real webhook traffic from Slack/Teams/GChat.
+
+### Setup
+
+1. Deploy a preview branch to Vercel (e.g., `https://chat-sdk-git-feature-branch.vercel.app`)
+2. Go to `/settings` on the production deployment
+3. Enter the preview branch URL and save
+
+### To disable
+
+Clear the URL on the settings page.
+
+### Files
+
+- `examples/nextjs-chat/src/middleware.ts` - The proxy middleware
+- `examples/nextjs-chat/src/app/settings/page.tsx` - Settings UI
+- `examples/nextjs-chat/src/app/api/settings/preview-branch/route.ts` - API to get/set the URL
+
+---
+
 # Release Process
 
 This project uses [Changesets](https://github.com/changesets/changesets) for version management and automated npm publishing.
@@ -64,11 +88,11 @@ $ pnpm changeset
 
 ### Changeset Types
 
-| Type | When to Use | Version Bump |
-|------|-------------|--------------|
-| `patch` | Bug fixes, minor improvements | `4.0.0` → `4.0.1` |
+| Type    | When to Use                        | Version Bump      |
+| ------- | ---------------------------------- | ----------------- |
+| `patch` | Bug fixes, minor improvements      | `4.0.0` → `4.0.1` |
 | `minor` | New features (backward compatible) | `4.0.0` → `4.1.0` |
-| `major` | Breaking changes | `4.0.0` → `5.0.0` |
+| `major` | Breaking changes                   | `4.0.0` → `5.0.0` |
 
 ## Automated Release Process
 
@@ -123,6 +147,7 @@ An npm access token with publish permissions for the `@chat-adapter` scope and `
 This is automatically provided by GitHub Actions. No setup needed.
 
 It's used to:
+
 - Create the "Version Packages" PR
 - Push version commits
 - Create git tags
@@ -162,13 +187,13 @@ The changeset config is in `.changeset/config.json`:
 }
 ```
 
-| Option | Value | Description |
-|--------|-------|-------------|
-| `access` | `"public"` | Publish scoped packages publicly |
-| `baseBranch` | `"main"` | Branch to compare against |
-| `fixed` | `[["chat", "@chat-adapter/*"]]` | All packages always have same version |
-| `ignore` | `["example-nextjs-chat", ...]` | Don't publish these packages |
-| `updateInternalDependencies` | `"patch"` | Auto-bump dependents on patch releases |
+| Option                       | Value                           | Description                            |
+| ---------------------------- | ------------------------------- | -------------------------------------- |
+| `access`                     | `"public"`                      | Publish scoped packages publicly       |
+| `baseBranch`                 | `"main"`                        | Branch to compare against              |
+| `fixed`                      | `[["chat", "@chat-adapter/*"]]` | All packages always have same version  |
+| `ignore`                     | `["example-nextjs-chat", ...]`  | Don't publish these packages           |
+| `updateInternalDependencies` | `"patch"`                       | Auto-bump dependents on patch releases |
 
 ## Troubleshooting
 

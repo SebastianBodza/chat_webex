@@ -75,7 +75,7 @@ export async function middleware(request: NextRequest) {
     previewBranchUrl
   );
 
-  console.log(`[middleware] Proxying ${pathname} to ${targetUrl.hostname}`);
+  console.warn(`[middleware] Proxying ${pathname} to ${targetUrl.hostname}`);
 
   // Proxy the request to the preview branch
   return NextResponse.rewrite(targetUrl);
