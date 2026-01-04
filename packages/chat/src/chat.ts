@@ -643,6 +643,7 @@ export class Chat<
    * - Slack: `U...` (e.g., "U03STHCA1JM")
    * - Teams: `29:...` (e.g., "29:198PbJuw...")
    * - Google Chat: `users/...` (e.g., "users/117994873354375860089")
+   * - Discord: numeric snowflake (e.g., "1033044521375764530")
    *
    * @param user - Platform-specific user ID string, or an Author object
    * @returns A Thread that can be used to post messages
@@ -696,8 +697,14 @@ export class Chat<
       if (adapter) return adapter;
     }
 
+    // Discord: snowflake ID (17-19 digit number)
+    if (/^\d{17,19}$/.test(userId)) {
+      const adapter = this.adapters.get("discord");
+      if (adapter) return adapter;
+    }
+
     throw new ChatError(
-      `Cannot infer adapter from userId "${userId}". Expected format: Slack (U...), Teams (29:...), or Google Chat (users/...).`,
+      `Cannot infer adapter from userId "${userId}". Expected format: Slack (U...), Teams (29:...), Google Chat (users/...), or Discord (numeric snowflake).`,
       "UNKNOWN_USER_ID_FORMAT",
     );
   }

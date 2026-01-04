@@ -27,7 +27,7 @@ import type {
   ThreadInfo,
   WebhookOptions,
 } from "chat";
-import { convertEmojiPlaceholders, defaultEmojiResolver } from "chat";
+import { convertEmojiPlaceholders, defaultEmojiResolver, getEmoji } from "chat";
 import {
   Client,
   type Message as DiscordJsMessage,
@@ -1018,6 +1018,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.DirectMessageReactions,
       ],
     });
 
@@ -1025,10 +1027,20 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
 
     // Set up message handler
     client.on(Events.MessageCreate, async (message: DiscordJsMessage) => {
-      if (isShuttingDown) return;
+      if (isShuttingDown) {
+        this.logger.debug("Ignoring message - Gateway is shutting down");
+        return;
+      }
 
       // Ignore messages from bots (including ourselves)
-      if (message.author.bot) return;
+      if (message.author.bot) {
+        this.logger.debug("Ignoring message from bot", {
+          authorId: message.author.id,
+          authorName: message.author.username,
+          isMe: message.author.id === client.user?.id,
+        });
+        return;
+      }
 
       // Check if we're mentioned
       const isMentioned = message.mentions.has(client.user?.id ?? "");
@@ -1070,6 +1082,92 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
 
       // Process the message through our chat handlers
       await this.handleGatewayMessage(message, isMentioned);
+    });
+
+    // Set up reaction add handler
+    client.on(Events.MessageReactionAdd, async (reaction, user) => {
+      if (isShuttingDown) {
+        this.logger.debug("Ignoring reaction - Gateway is shutting down");
+        return;
+      }
+
+      // Ignore reactions from bots (including ourselves)
+      if (user.bot) {
+        this.logger.debug("Ignoring reaction from bot", {
+          userId: user.id,
+          isMe: user.id === client.user?.id,
+        });
+        return;
+      }
+
+      this.logger.info("Discord Gateway reaction added", {
+        emoji: reaction.emoji.name,
+        messageId: reaction.message.id,
+        channelId: reaction.message.channelId,
+        userId: user.id,
+      });
+
+      // Record the Gateway event if callback provided
+      if (onGatewayEvent) {
+        onGatewayEvent("MESSAGE_REACTION_ADD", {
+          emoji: {
+            name: reaction.emoji.name,
+            id: reaction.emoji.id,
+          },
+          message_id: reaction.message.id,
+          channel_id: reaction.message.channelId,
+          guild_id: reaction.message.guildId,
+          user_id: user.id,
+        });
+      }
+
+      // Process the reaction (skip partial users without username)
+      if (user.username) {
+        await this.handleGatewayReaction(reaction, user as { id: string; username: string; bot: boolean }, true);
+      }
+    });
+
+    // Set up reaction remove handler
+    client.on(Events.MessageReactionRemove, async (reaction, user) => {
+      if (isShuttingDown) {
+        this.logger.debug("Ignoring reaction removal - Gateway is shutting down");
+        return;
+      }
+
+      // Ignore reactions from bots (including ourselves)
+      if (user.bot) {
+        this.logger.debug("Ignoring reaction removal from bot", {
+          userId: user.id,
+          isMe: user.id === client.user?.id,
+        });
+        return;
+      }
+
+      this.logger.info("Discord Gateway reaction removed", {
+        emoji: reaction.emoji.name,
+        messageId: reaction.message.id,
+        channelId: reaction.message.channelId,
+        userId: user.id,
+      });
+
+      // Record the Gateway event if callback provided
+      if (onGatewayEvent) {
+        onGatewayEvent("MESSAGE_REACTION_REMOVE", {
+          emoji: {
+            name: reaction.emoji.name,
+            id: reaction.emoji.id,
+          },
+          message_id: reaction.message.id,
+          channel_id: reaction.message.channelId,
+          guild_id: reaction.message.guildId,
+          user_id: user.id,
+        });
+      }
+
+      // Process the reaction (skip partial users without username)
+      if (user.username) {
+        await this.handleGatewayReaction(reaction, user as { id: string; username: string; bot: boolean }, false);
+      }
     });
 
     client.on(Events.ClientReady, () => {
@@ -1227,6 +1325,91 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         messageId: message.id,
       });
     }
+  }
+
+  /**
+   * Handle a reaction received via the Gateway WebSocket.
+   */
+  private async handleGatewayReaction(
+    reaction: { emoji: { name: string | null; id: string | null }; message: { id: string; channelId: string; guildId: string | null } },
+    user: { id: string; username: string; bot: boolean },
+    added: boolean,
+  ): Promise<void> {
+    if (!this.chat) return;
+
+    const guildId = reaction.message.guildId || "@me";
+    const channelId = reaction.message.channelId;
+
+    // For reactions, we don't know if the message is in a thread without fetching it
+    // Use the channel ID directly for now
+    const threadId = this.encodeThreadId({
+      guildId,
+      channelId,
+      threadId: undefined,
+    });
+
+    // Normalize emoji
+    const emojiName = reaction.emoji.name || "unknown";
+    const normalizedEmoji = this.normalizeDiscordEmoji(emojiName);
+
+    // Build reaction event
+    const reactionEvent = {
+      adapter: this as Adapter,
+      threadId,
+      messageId: reaction.message.id,
+      emoji: normalizedEmoji,
+      rawEmoji: reaction.emoji.id
+        ? `<:${emojiName}:${reaction.emoji.id}>`
+        : emojiName,
+      added,
+      user: {
+        userId: user.id,
+        userName: user.username,
+        fullName: user.username,
+        isBot: user.bot,
+        isMe: false,
+      },
+      raw: {
+        emoji: reaction.emoji,
+        message_id: reaction.message.id,
+        channel_id: reaction.message.channelId,
+        guild_id: reaction.message.guildId,
+        user_id: user.id,
+      },
+    };
+
+    this.chat.processReaction(reactionEvent);
+  }
+
+  /**
+   * Normalize a Discord emoji to our standard EmojiValue format.
+   */
+  private normalizeDiscordEmoji(emojiName: string): EmojiValue {
+    // Map common Discord unicode emoji to our standard names
+    const unicodeToName: Record<string, string> = {
+      "👍": "thumbs_up",
+      "👎": "thumbs_down",
+      "❤️": "heart",
+      "❤": "heart",
+      "🔥": "fire",
+      "🚀": "rocket",
+      "🙌": "raised_hands",
+      "✅": "check",
+      "❌": "x",
+      "👋": "wave",
+      "🤔": "thinking",
+      "😊": "smile",
+      "😂": "laugh",
+      "🎉": "party",
+      "⭐": "star",
+      "✨": "sparkles",
+      "👀": "eyes",
+      "💯": "100",
+    };
+
+    // Check if it's a unicode emoji we recognize
+    const normalizedName = unicodeToName[emojiName] || emojiName;
+    return getEmoji(normalizedName);
   }
 }
 
