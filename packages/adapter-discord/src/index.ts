@@ -394,11 +394,43 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       messageId: result.id,
     });
 
+    // Store thread root mapping so replies to this message can find the thread
+    await this.storeThreadRootMapping(channelId, result.id, threadId);
+
     return {
       id: result.id,
       threadId,
       raw: result,
     };
+  }
+
+  /**
+   * Store a mapping from a message ID to its thread root.
+   * This enables Slack-like threading where replies continue the conversation.
+   */
+  private async storeThreadRootMapping(
+    channelId: string,
+    messageId: string,
+    threadId: string,
+  ): Promise<void> {
+    if (!this.chat) return;
+
+    // Extract thread root from threadId (format: discord:{guild}:{channel}:{threadRoot})
+    const { threadId: threadRoot } = this.decodeThreadId(threadId);
+    if (!threadRoot) return;
+
+    const refKey = `discord:thread-root:${channelId}:${messageId}`;
+    const state = this.chat.getState();
+
+    // Store for 7 days (conversations rarely last longer)
+    const TTL_MS = 7 * 24 * 60 * 60 * 1000;
+    await state.set(refKey, threadRoot, TTL_MS);
+
+    this.logger.debug("Stored thread root mapping", {
+      messageId,
+      threadRoot,
+      channelId,
+    });
   }
 
   /**
@@ -453,6 +485,9 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
 
     const result = (await response.json()) as APIMessage;
+
+    // Store thread root mapping so replies to this message can find the thread
+    await this.storeThreadRootMapping(channelId, result.id, threadId);
 
     return {
       id: result.id,
@@ -1072,7 +1107,31 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
 
     const guildId = message.guildId || "@me";
     const channelId = message.channelId;
-    const threadId = this.encodeThreadId({ guildId, channelId });
+
+    // Determine thread root for Slack-like threading behavior:
+    // - If message is a reply, find the thread root from the reference chain
+    // - If message is not a reply, this message becomes the thread root
+    let threadRootId: string | undefined;
+
+    if (message.reference?.messageId) {
+      // Message is a reply - look up the thread root from state
+      const refKey = `discord:thread-root:${channelId}:${message.reference.messageId}`;
+      const state = this.chat.getState();
+      const storedRoot = await state.get<string>(refKey);
+
+      // If we don't have a mapping, the user replied to an old message
+      // Use the reference message ID as the thread root
+      threadRootId = storedRoot ?? message.reference.messageId;
+    } else {
+      // New message (not a reply) - this message is the thread root
+      threadRootId = message.id;
+    }
+
+    const threadId = this.encodeThreadId({
+      guildId,
+      channelId,
+      threadId: threadRootId,
+    });
 
     // Convert discord.js message to our Message format
     const chatMessage: Message = {
@@ -1115,6 +1174,9 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     };
 
     try {
+      // Store thread root mapping for this message so replies can find the thread
+      await this.storeThreadRootMapping(channelId, message.id, threadId);
+
       // Set pending reply context so responses are threaded
       this.pendingReplies.set(threadId, message.id);
       await this.chat.handleIncomingMessage(this, threadId, chatMessage);
