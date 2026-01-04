@@ -6,7 +6,6 @@ import { recorder } from "@/lib/recorder";
 export const maxDuration = 800;
 
 const GATEWAY_CHANNEL = "discord:gateway:control";
-const LISTENER_ID = `listener-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
  * Start the Discord Gateway WebSocket listener.
@@ -20,9 +19,15 @@ const LISTENER_ID = `listener-${Date.now()}-${Math.random().toString(36).slice(2
  * Optional query param: ?duration=180000 (milliseconds)
  */
 export async function POST(request: Request): Promise<Response> {
+  // Generate unique listener ID per request
+  const listenerId = `listener-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  console.log(`[discord-gateway] Starting gateway listener: ${listenerId}`);
+
   const discord = bot.getAdapter("discord");
 
   if (!discord) {
+    console.log("[discord-gateway] Discord adapter not configured");
     return new Response("Discord adapter not configured", { status: 404 });
   }
 
@@ -60,19 +65,17 @@ export async function POST(request: Request): Promise<Response> {
         // Subscribe to shutdown signals
         await subClient.subscribe(GATEWAY_CHANNEL, (message) => {
           // Ignore our own startup message
-          if (message === LISTENER_ID) return;
+          if (message === listenerId) return;
 
           console.log(
-            `[discord-gateway] Received shutdown signal from ${message}, stopping this listener`,
+            `[discord-gateway] ${listenerId} received shutdown signal from ${message}`,
           );
           abortController?.abort();
         });
 
         // Publish that we're starting (this will shut down other listeners)
-        await pubClient.publish(GATEWAY_CHANNEL, LISTENER_ID);
-        console.log(
-          `[discord-gateway] Published startup signal: ${LISTENER_ID}`,
-        );
+        await pubClient.publish(GATEWAY_CHANNEL, listenerId);
+        console.log(`[discord-gateway] Published startup signal: ${listenerId}`);
 
         // Keep subscription alive until abort or timeout
         await new Promise<void>((resolve) => {
@@ -95,18 +98,38 @@ export async function POST(request: Request): Promise<Response> {
           pubClient.quit().catch(() => {}),
           subClient.quit().catch(() => {}),
         ]);
+        console.log(`[discord-gateway] ${listenerId} pub/sub cleanup complete`);
       }
     });
   }
 
-  return discord.startGatewayListener(
-    {
-      waitUntil: (task: Promise<unknown>) => after(() => task),
-    },
-    actualDuration,
-    onGatewayEvent,
-    abortController?.signal,
-  );
+  try {
+    console.log(`[discord-gateway] Calling startGatewayListener`);
+    const response = await discord.startGatewayListener(
+      {
+        waitUntil: (task: Promise<unknown>) => after(() => task),
+      },
+      actualDuration,
+      onGatewayEvent,
+      abortController?.signal,
+    );
+    console.log(
+      `[discord-gateway] startGatewayListener returned status: ${response.status}`,
+    );
+    return response;
+  } catch (error) {
+    console.error("[discord-gateway] Error in startGatewayListener:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to start gateway listener",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 }
 
 /**
