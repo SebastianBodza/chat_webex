@@ -24,6 +24,9 @@ export async function POST(request: Request): Promise<Response> {
 
   console.log(`[discord-gateway] Starting gateway listener: ${listenerId}`);
 
+  // Ensure bot is initialized (this normally happens on first webhook)
+  await bot.initialize();
+
   const discord = bot.getAdapter("discord");
 
   if (!discord) {
@@ -75,7 +78,9 @@ export async function POST(request: Request): Promise<Response> {
 
         // Publish that we're starting (this will shut down other listeners)
         await pubClient.publish(GATEWAY_CHANNEL, listenerId);
-        console.log(`[discord-gateway] Published startup signal: ${listenerId}`);
+        console.log(
+          `[discord-gateway] Published startup signal: ${listenerId}`,
+        );
 
         // Keep subscription alive until abort or timeout
         await new Promise<void>((resolve) => {

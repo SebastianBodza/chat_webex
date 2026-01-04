@@ -214,6 +214,15 @@ export class Chat<
   }
 
   /**
+   * Initialize the chat instance and all adapters.
+   * This is called automatically when handling webhooks, but can be called
+   * manually for non-webhook use cases (e.g., Gateway listeners).
+   */
+  async initialize(): Promise<void> {
+    await this.ensureInitialized();
+  }
+
+  /**
    * Register a handler for new @-mentions of the bot.
    *
    * **Important**: This handler is ONLY called for mentions in **unsubscribed** threads.
