@@ -5,9 +5,8 @@
  * to reduce code duplication and ensure consistent behavior.
  */
 
-import type { CardElement } from "chat";
+import type { AdapterPostableMessage, CardElement, FileUpload } from "chat";
 import { isCardElement } from "chat";
-import type { AdapterPostableMessage, FileUpload } from "chat";
 
 /**
  * Extract CardElement from an AdapterPostableMessage if present.

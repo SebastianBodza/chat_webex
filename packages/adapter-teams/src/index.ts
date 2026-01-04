@@ -238,9 +238,23 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       // Store serviceUrl and tenantId for DM creation
       this.chat
         .getState()
-        .set(`teams:serviceUrl:${userId}`, activity.serviceUrl, ttl);
+        .set(`teams:serviceUrl:${userId}`, activity.serviceUrl, ttl)
+        .catch((err) => {
+          this.logger?.warn("Failed to cache serviceUrl", {
+            userId,
+            error: err,
+          });
+        });
       if (tenantId) {
-        this.chat.getState().set(`teams:tenantId:${userId}`, tenantId, ttl);
+        this.chat
+          .getState()
+          .set(`teams:tenantId:${userId}`, tenantId, ttl)
+          .catch((err) => {
+            this.logger?.warn("Failed to cache tenantId", {
+              userId,
+              error: err,
+            });
+          });
       }
 
       // Cache team/channel context for proper message fetching in channel threads
@@ -268,14 +282,26 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
         // Cache by conversation ID (channel)
         this.chat
           .getState()
-          .set(`teams:channelContext:${baseChannelId}`, contextJson, ttl);
+          .set(`teams:channelContext:${baseChannelId}`, contextJson, ttl)
+          .catch((err) => {
+            this.logger?.warn("Failed to cache channel context", {
+              conversationId: baseChannelId,
+              error: err,
+            });
+          });
 
         // Also cache by team thread-style ID for lookup from regular messages
         // (which don't have aadGroupId but do have team.id)
         if (teamThreadId) {
           this.chat
             .getState()
-            .set(`teams:teamContext:${teamThreadId}`, contextJson, ttl);
+            .set(`teams:teamContext:${teamThreadId}`, contextJson, ttl)
+            .catch((err) => {
+              this.logger?.warn("Failed to cache team context", {
+                teamThreadId,
+                error: err,
+              });
+            });
         }
 
         this.logger?.info(
@@ -302,7 +328,13 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
               `teams:channelContext:${baseChannelId}`,
               cachedTeamContext,
               ttl,
-            );
+            )
+            .catch((err) => {
+              this.logger?.warn("Failed to cache channel context from team", {
+                conversationId: baseChannelId,
+                error: err,
+              });
+            });
           this.logger?.info("Using cached Teams team GUID for channel", {
             conversationId: baseChannelId,
             teamThreadId,
@@ -323,12 +355,24 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
               // Cache by conversation ID
               this.chat
                 .getState()
-                .set(`teams:channelContext:${baseChannelId}`, contextJson, ttl);
+                .set(`teams:channelContext:${baseChannelId}`, contextJson, ttl)
+                .catch((err) => {
+                  this.logger?.warn("Failed to cache fetched channel context", {
+                    conversationId: baseChannelId,
+                    error: err,
+                  });
+                });
 
               // Also cache by team thread-style ID
               this.chat
                 .getState()
-                .set(`teams:teamContext:${teamThreadId}`, contextJson, ttl);
+                .set(`teams:teamContext:${teamThreadId}`, contextJson, ttl)
+                .catch((err) => {
+                  this.logger?.warn("Failed to cache fetched team context", {
+                    teamThreadId,
+                    error: err,
+                  });
+                });
 
               this.logger?.info(
                 "Fetched and cached Teams team GUID via TeamsInfo API",

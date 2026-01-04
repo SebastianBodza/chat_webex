@@ -19,7 +19,15 @@ import {
 import {
   isJSX as _isJSX,
   toCardElement as _toCardElement,
+  type ButtonProps,
   type CardJSXElement,
+  type CardJSXProps,
+  type CardProps,
+  type ContainerProps,
+  type DividerProps,
+  type FieldProps,
+  type ImageProps,
+  type TextProps,
 } from "./jsx-runtime";
 export const Actions = _Actions;
 export const Button = _Button;
@@ -52,7 +60,17 @@ export type {
   TextStyle,
 } from "./cards";
 // JSX types
-export type { CardJSXElement };
+export type {
+  ButtonProps,
+  CardJSXElement,
+  CardJSXProps,
+  CardProps,
+  ContainerProps,
+  DividerProps,
+  FieldProps,
+  ImageProps,
+  TextProps,
+};
 // Emoji utilities
 export {
   convertEmojiPlaceholders,

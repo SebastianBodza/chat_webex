@@ -763,7 +763,10 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     if (resolvedSpaceName && options?.waitUntil) {
       options.waitUntil(
         this.ensureSpaceSubscription(resolvedSpaceName).catch((err) => {
-          this.logger?.debug("Subscription refresh failed", { error: err });
+          this.logger?.warn("Subscription refresh failed", {
+            spaceName: resolvedSpaceName,
+            error: err,
+          });
         }),
       );
     }
@@ -2030,7 +2033,9 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
     // If display name is provided and not "unknown", use it
     if (providedDisplayName && providedDisplayName !== "unknown") {
       // Also cache it for future use
-      this.cacheUserInfo(userId, providedDisplayName).catch(() => {});
+      this.cacheUserInfo(userId, providedDisplayName).catch((err) => {
+        this.logger?.warn("Failed to cache user info", { userId, error: err });
+      });
       return providedDisplayName;
     }
 

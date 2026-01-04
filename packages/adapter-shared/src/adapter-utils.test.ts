@@ -1,8 +1,9 @@
 /**
  * Tests for shared adapter utility functions.
  */
-import { Card, CardText } from "chat";
+
 import type { AdapterPostableMessage, FileUpload } from "chat";
+import { Card, CardText } from "chat";
 import { describe, expect, it } from "vitest";
 import { extractCard, extractFiles } from "./adapter-utils";
 

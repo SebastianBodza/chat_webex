@@ -33,6 +33,8 @@ import {
   Actions,
   Button,
   type ButtonElement,
+  type ButtonStyle,
+  Card,
   type CardChild,
   type CardElement,
   Divider,
@@ -48,22 +50,88 @@ import {
 // Symbol to identify our JSX elements before they're processed
 const JSX_ELEMENT = Symbol.for("chat.jsx.element");
 
+// ============================================================================
+// JSX Props Types - Strongly typed props for each component
+// ============================================================================
+
+/** Props for Card component in JSX */
+export interface CardProps {
+  title?: string;
+  subtitle?: string;
+  imageUrl?: string;
+  children?: unknown;
+}
+
+/** Props for Text component in JSX */
+export interface TextProps {
+  style?: TextStyle;
+  children?: string | number;
+}
+
+/** Props for Button component in JSX */
+export interface ButtonProps {
+  id: string;
+  label?: string;
+  style?: ButtonStyle;
+  value?: string;
+  children?: string | number;
+}
+
+/** Props for Image component in JSX */
+export interface ImageProps {
+  url: string;
+  alt?: string;
+}
+
+/** Props for Field component in JSX */
+export interface FieldProps {
+  label: string;
+  value: string;
+}
+
+/** Props for container components (Section, Actions, Fields) */
+export interface ContainerProps {
+  children?: unknown;
+}
+
+/** Props for Divider component (no props) */
+export type DividerProps = Record<string, never>;
+
+/** Union of all valid JSX props */
+export type CardJSXProps =
+  | CardProps
+  | TextProps
+  | ButtonProps
+  | ImageProps
+  | FieldProps
+  | ContainerProps
+  | DividerProps;
+
+/** Component function type with proper overloads */
+type CardComponentFunction =
+  | typeof Card
+  | typeof Text
+  | typeof Button
+  | typeof Image
+  | typeof Field
+  | typeof Divider
+  | typeof Section
+  | typeof Actions
+  | typeof Fields;
+
 /**
  * Represents a JSX element from the chat JSX runtime.
  * This is the type returned when using JSX syntax with chat components.
  */
-export interface CardJSXElement {
+export interface CardJSXElement<P extends CardJSXProps = CardJSXProps> {
   $$typeof: typeof JSX_ELEMENT;
   type: CardComponentFunction;
-  props: Record<string, unknown>;
+  props: P;
   children: unknown[];
 }
 
 // Internal alias for backwards compatibility
 type JSXElement = CardJSXElement;
-
-// biome-ignore lint/suspicious/noExplicitAny: Card builder functions have varying signatures
-type CardComponentFunction = (...args: any[]) => CardElement | CardChild;
 
 /**
  * Check if a value is a JSX element from our runtime.
@@ -105,10 +173,10 @@ function processChildren(children: unknown): CardChildOrNested[] {
     return [children as CardChildOrNested];
   }
 
-  // If it's a string, it might be text content for a Button
-  if (typeof children === "string") {
-    // Return as-is, the component will handle it
-    return [children as unknown as CardChildOrNested];
+  // If it's a string or number, it might be text content for a Button or Text
+  if (typeof children === "string" || typeof children === "number") {
+    // Return as string, the component will handle it
+    return [String(children) as unknown as CardChildOrNested];
   }
 
   return [];
@@ -123,6 +191,50 @@ type AnyCardElement =
   | null;
 
 /**
+ * Type guard to check if props match TextProps
+ */
+function isTextProps(props: CardJSXProps): props is TextProps {
+  return !("id" in props) && !("url" in props) && !("label" in props);
+}
+
+/**
+ * Type guard to check if props match ButtonProps
+ */
+function isButtonProps(props: CardJSXProps): props is ButtonProps {
+  return "id" in props && typeof props.id === "string";
+}
+
+/**
+ * Type guard to check if props match ImageProps
+ */
+function isImageProps(props: CardJSXProps): props is ImageProps {
+  return "url" in props && typeof props.url === "string";
+}
+
+/**
+ * Type guard to check if props match FieldProps
+ */
+function isFieldProps(props: CardJSXProps): props is FieldProps {
+  return (
+    "label" in props &&
+    "value" in props &&
+    typeof props.label === "string" &&
+    typeof props.value === "string"
+  );
+}
+
+/**
+ * Type guard to check if props match CardProps
+ */
+function isCardProps(props: CardJSXProps): props is CardProps {
+  return (
+    !("id" in props) &&
+    !("url" in props) &&
+    ("title" in props || "subtitle" in props || "imageUrl" in props)
+  );
+}
+
+/**
  * Resolve a JSX element by calling its component function.
  * Transforms JSX props into the format each builder function expects.
  */
@@ -134,72 +246,81 @@ function resolveJSXElement(element: JSXElement): AnyCardElement {
 
   // Use identity comparison to determine which builder function this is
   // This is necessary because function names get minified in production builds
-  // Cast to unknown first to allow comparison between different function types
-  const fn = type as unknown;
-
-  if (fn === Text) {
+  if (type === Text) {
     // Text(content: string, options?: { style })
     // JSX children become the content string
+    const textProps = isTextProps(props) ? props : { style: undefined };
     const content =
       processedChildren.length > 0
         ? String(processedChildren[0])
-        : ((props.children as string) ?? "");
-    return Text(content, { style: props.style as TextStyle | undefined });
+        : String(textProps.children ?? "");
+    return Text(content, { style: textProps.style });
   }
 
-  if (fn === Section) {
+  if (type === Section) {
     // Section takes array as first argument
     return Section(processedChildren as CardChild[]);
   }
 
-  if (fn === Actions) {
+  if (type === Actions) {
     // Actions takes array of ButtonElements
-    return Actions(processedChildren as unknown as ButtonElement[]);
+    return Actions(processedChildren as ButtonElement[]);
   }
 
-  if (fn === Fields) {
+  if (type === Fields) {
     // Fields takes array of FieldElements
-    return Fields(processedChildren as unknown as FieldElement[]);
+    return Fields(processedChildren as FieldElement[]);
   }
 
-  if (fn === Button) {
+  if (type === Button) {
     // Button({ id, label, style, value })
     // JSX children become the label
+    if (!isButtonProps(props)) {
+      throw new Error("Button requires an 'id' prop");
+    }
     const label =
       processedChildren.length > 0
         ? String(processedChildren[0])
-        : ((props.label as string) ?? "");
+        : (props.label ?? "");
     return Button({
-      id: props.id as string,
+      id: props.id,
       label,
-      style: props.style as ButtonElement["style"],
-      value: props.value as string | undefined,
+      style: props.style,
+      value: props.value,
     });
   }
 
-  if (fn === Image) {
+  if (type === Image) {
     // Image({ url, alt })
-    return Image({ url: props.url as string, alt: props.alt as string });
+    if (!isImageProps(props)) {
+      throw new Error("Image requires a 'url' prop");
+    }
+    return Image({ url: props.url, alt: props.alt });
   }
 
-  if (fn === Field) {
+  if (type === Field) {
     // Field({ label, value })
+    if (!isFieldProps(props)) {
+      throw new Error("Field requires 'label' and 'value' props");
+    }
     return Field({
-      label: props.label as string,
-      value: props.value as string,
+      label: props.label,
+      value: props.value,
     });
   }
 
-  if (fn === Divider) {
+  if (type === Divider) {
     // Divider() - no args
     return Divider();
   }
 
   // Default: Card({ title, subtitle, imageUrl, children })
-  // Pass props with processed children
-  return type({
-    ...props,
-    children: processedChildren,
+  const cardProps = isCardProps(props) ? props : {};
+  return Card({
+    title: cardProps.title,
+    subtitle: cardProps.subtitle,
+    imageUrl: cardProps.imageUrl,
+    children: processedChildren as CardChild[],
   });
 }
 
@@ -207,16 +328,16 @@ function resolveJSXElement(element: JSXElement): AnyCardElement {
  * JSX factory function (used by the JSX transform).
  * Creates a lazy JSX element that will be resolved when needed.
  */
-export function jsx(
+export function jsx<P extends CardJSXProps>(
   type: CardComponentFunction,
-  props: Record<string, unknown>,
+  props: P & { children?: unknown },
   _key?: string,
-): JSXElement {
+): CardJSXElement<P> {
   const { children, ...restProps } = props;
   return {
     $$typeof: JSX_ELEMENT,
     type,
-    props: restProps,
+    props: restProps as P,
     children: children != null ? [children] : [],
   };
 }
@@ -224,16 +345,16 @@ export function jsx(
 /**
  * JSX factory for elements with multiple children.
  */
-export function jsxs(
+export function jsxs<P extends CardJSXProps>(
   type: CardComponentFunction,
-  props: Record<string, unknown>,
+  props: P & { children?: unknown },
   _key?: string,
-): JSXElement {
+): CardJSXElement<P> {
   const { children, ...restProps } = props;
   return {
     $$typeof: JSX_ELEMENT,
     type,
-    props: restProps,
+    props: restProps as P,
     children: Array.isArray(children)
       ? children
       : children != null
