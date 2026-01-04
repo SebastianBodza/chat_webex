@@ -83,6 +83,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     this.chat = chat;
     this.logger.info("Discord adapter initialized", {
       applicationId: this.applicationId,
+      // Log full public key for debugging - it's public, not secret
+      publicKey: this.publicKey,
     });
   }
 
@@ -93,19 +95,23 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     request: Request,
     options?: WebhookOptions,
   ): Promise<Response> {
-    const body = await request.text();
+    // Get raw body bytes for signature verification
+    const bodyBuffer = await request.arrayBuffer();
+    const bodyBytes = new Uint8Array(bodyBuffer);
+    const body = new TextDecoder().decode(bodyBytes);
 
     this.logger.info("Discord webhook received", {
       bodyLength: body.length,
+      bodyBytesLength: bodyBytes.length,
       hasSignature: !!request.headers.get("x-signature-ed25519"),
       hasTimestamp: !!request.headers.get("x-signature-timestamp"),
     });
 
-    // Verify Ed25519 signature
+    // Verify Ed25519 signature using raw bytes
     const signature = request.headers.get("x-signature-ed25519");
     const timestamp = request.headers.get("x-signature-timestamp");
 
-    if (!(await this.verifySignature(body, signature, timestamp))) {
+    if (!(await this.verifySignature(bodyBytes, signature, timestamp))) {
       return new Response("Invalid signature", { status: 401 });
     }
 
@@ -150,7 +156,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
    * Verify Discord's Ed25519 signature using official discord-interactions library.
    */
   private async verifySignature(
-    body: string,
+    bodyBytes: Uint8Array,
     signature: string | null,
     timestamp: string | null,
   ): Promise<boolean> {
@@ -166,15 +172,16 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
 
     try {
-      // Use the official discord-interactions library for verification
+      // Use the official discord-interactions library for verification with raw bytes
       const isValid = await verifyKey(
-        body,
+        bodyBytes,
         signature,
         timestamp,
         this.publicKey,
       );
 
       if (!isValid) {
+        const bodyString = new TextDecoder().decode(bodyBytes);
         this.logger.warn(
           "Discord signature verification failed: invalid signature",
           {
@@ -183,8 +190,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
             publicKeyPrefix: this.publicKey.slice(0, 8),
             publicKeySuffix: this.publicKey.slice(-8),
             timestamp,
-            bodyLength: body.length,
-            bodyPrefix: body.slice(0, 50),
+            bodyLength: bodyBytes.length,
+            bodyPrefix: bodyString.slice(0, 50),
           },
         );
       }
