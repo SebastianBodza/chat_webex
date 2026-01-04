@@ -50,7 +50,19 @@ export interface FetchRecord {
   durationMs: number;
 }
 
-export type RecordEntry = WebhookRecord | ApiCallRecord | FetchRecord;
+export interface GatewayRecord {
+  type: "gateway";
+  timestamp: number;
+  platform: string;
+  eventType: string;
+  body: string;
+}
+
+export type RecordEntry =
+  | WebhookRecord
+  | ApiCallRecord
+  | FetchRecord
+  | GatewayRecord;
 
 // Headers that contain sensitive data - values will be redacted
 const SENSITIVE_HEADERS = new Set([
@@ -173,6 +185,27 @@ class Recorder {
       args,
       response,
       error: error?.message,
+    };
+
+    await this.appendRecord(record);
+  }
+
+  /**
+   * Record a Gateway WebSocket event (e.g., Discord Gateway messages).
+   */
+  async recordGatewayEvent(
+    platform: string,
+    eventType: string,
+    data: unknown,
+  ): Promise<void> {
+    if (!this.isEnabled || !this.redis) return;
+
+    const record: GatewayRecord = {
+      type: "gateway",
+      timestamp: Date.now(),
+      platform,
+      eventType,
+      body: JSON.stringify(data),
     };
 
     await this.appendRecord(record);

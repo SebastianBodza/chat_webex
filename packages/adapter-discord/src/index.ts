@@ -29,6 +29,12 @@ import type {
 } from "chat";
 import { convertEmojiPlaceholders, defaultEmojiResolver } from "chat";
 import {
+  Client,
+  type Message as DiscordJsMessage,
+  Events,
+  GatewayIntentBits,
+} from "discord.js";
+import {
   type APIEmbed,
   type APIMessage,
   ChannelType,
@@ -812,7 +818,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
    * Determine attachment type from MIME type.
    */
   private getAttachmentType(
-    mimeType?: string,
+    mimeType?: string | null,
   ): "image" | "video" | "audio" | "file" {
     if (!mimeType) return "file";
     if (mimeType.startsWith("image/")) return "image";
@@ -866,6 +872,243 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
 
     return response;
+  }
+
+  /**
+   * Start Gateway WebSocket listener for receiving messages/mentions.
+   * Uses waitUntil to keep the connection alive for the specified duration.
+   *
+   * This is a workaround for serverless environments - the Gateway connection
+   * will stay alive for the duration, listening for messages.
+   *
+   * @param options - Webhook options with waitUntil function
+   * @param durationMs - How long to keep listening (default: 180000ms = 3 minutes)
+   * @param onGatewayEvent - Optional callback for recording/logging Gateway events
+   * @param abortSignal - Optional AbortSignal to stop the listener early (e.g., when a new listener starts)
+   * @returns Response indicating the listener was started
+   */
+  async startGatewayListener(
+    options: WebhookOptions,
+    durationMs = 180000,
+    onGatewayEvent?: (eventType: string, data: unknown) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<Response> {
+    if (!this.chat) {
+      return new Response("Chat instance not initialized", { status: 500 });
+    }
+
+    if (!options.waitUntil) {
+      return new Response("waitUntil not provided", { status: 500 });
+    }
+
+    this.logger.info("Starting Discord Gateway listener", { durationMs });
+
+    // Create a promise that resolves after the duration
+    const listenerPromise = this.runGatewayListener(
+      durationMs,
+      onGatewayEvent,
+      abortSignal,
+    );
+
+    // Use waitUntil to keep the function alive
+    options.waitUntil(listenerPromise);
+
+    return new Response(
+      JSON.stringify({
+        status: "listening",
+        durationMs,
+        message: `Gateway listener started, will run for ${durationMs / 1000} seconds`,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  /**
+   * Run the Gateway listener for a specified duration.
+   */
+  private async runGatewayListener(
+    durationMs: number,
+    onGatewayEvent?: (eventType: string, data: unknown) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<void> {
+    const client = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.DirectMessages,
+      ],
+    });
+
+    let isShuttingDown = false;
+
+    // Set up message handler
+    client.on(Events.MessageCreate, async (message: DiscordJsMessage) => {
+      if (isShuttingDown) return;
+
+      // Ignore messages from bots (including ourselves)
+      if (message.author.bot) return;
+
+      // Check if we're mentioned
+      const isMentioned = message.mentions.has(client.user?.id ?? "");
+
+      this.logger.info("Discord Gateway message received", {
+        channelId: message.channelId,
+        guildId: message.guildId,
+        authorId: message.author.id,
+        isMentioned,
+        content: message.content.slice(0, 100),
+      });
+
+      // Record the Gateway event if callback provided
+      if (onGatewayEvent) {
+        onGatewayEvent("MESSAGE_CREATE", {
+          id: message.id,
+          channel_id: message.channelId,
+          guild_id: message.guildId,
+          content: message.content,
+          author: {
+            id: message.author.id,
+            username: message.author.username,
+            bot: message.author.bot,
+          },
+          timestamp: message.createdAt.toISOString(),
+          mentions: message.mentions.users.map((u) => ({
+            id: u.id,
+            username: u.username,
+          })),
+          attachments: message.attachments.map((a) => ({
+            id: a.id,
+            filename: a.name,
+            url: a.url,
+            content_type: a.contentType,
+            size: a.size,
+          })),
+        });
+      }
+
+      // Process the message through our chat handlers
+      await this.handleGatewayMessage(message, isMentioned);
+    });
+
+    client.on(Events.ClientReady, () => {
+      this.logger.info("Discord Gateway connected", {
+        username: client.user?.username,
+        id: client.user?.id,
+      });
+    });
+
+    client.on(Events.Error, (error) => {
+      this.logger.error("Discord Gateway error", { error: String(error) });
+    });
+
+    try {
+      // Login to Discord
+      await client.login(this.botToken);
+
+      // Wait for either: duration timeout OR abort signal
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, durationMs);
+
+        // Listen for abort signal (e.g., when a new listener starts)
+        if (abortSignal) {
+          if (abortSignal.aborted) {
+            clearTimeout(timeout);
+            resolve();
+            return;
+          }
+          abortSignal.addEventListener(
+            "abort",
+            () => {
+              this.logger.info(
+                "Discord Gateway listener received abort signal (new listener started)",
+              );
+              clearTimeout(timeout);
+              resolve();
+            },
+            { once: true },
+          );
+        }
+      });
+
+      this.logger.info(
+        "Discord Gateway listener duration elapsed, disconnecting",
+      );
+    } catch (error) {
+      this.logger.error("Discord Gateway listener error", {
+        error: String(error),
+      });
+    } finally {
+      isShuttingDown = true;
+      client.destroy();
+      this.logger.info("Discord Gateway listener stopped");
+    }
+  }
+
+  /**
+   * Handle a message received via the Gateway WebSocket.
+   */
+  private async handleGatewayMessage(
+    message: DiscordJsMessage,
+    isMentioned: boolean,
+  ): Promise<void> {
+    if (!this.chat) return;
+
+    const guildId = message.guildId || "@me";
+    const channelId = message.channelId;
+    const threadId = this.encodeThreadId({ guildId, channelId });
+
+    // Convert discord.js message to our Message format
+    const chatMessage: Message = {
+      id: message.id,
+      threadId,
+      text: message.content,
+      formatted: this.formatConverter.toAst(message.content),
+      author: {
+        userId: message.author.id,
+        userName: message.author.username,
+        fullName: message.author.displayName || message.author.username,
+        isBot: message.author.bot,
+        isMe: false, // Gateway messages are never from ourselves (we filter those)
+      },
+      metadata: {
+        dateSent: message.createdAt,
+        edited: message.editedAt !== null,
+        editedAt: message.editedAt ?? undefined,
+      },
+      attachments: message.attachments.map((a) => ({
+        type: this.getAttachmentType(a.contentType),
+        url: a.url,
+        name: a.name,
+        mimeType: a.contentType ?? undefined,
+        size: a.size,
+      })),
+      raw: {
+        id: message.id,
+        channel_id: channelId,
+        guild_id: guildId,
+        content: message.content,
+        author: {
+          id: message.author.id,
+          username: message.author.username,
+        },
+        timestamp: message.createdAt.toISOString(),
+      },
+      // Add isMention flag for the chat handlers
+      isMention: isMentioned,
+    };
+
+    try {
+      await this.chat.handleIncomingMessage(this, threadId, chatMessage);
+    } catch (error) {
+      this.logger.error("Error handling Gateway message", {
+        error: String(error),
+        messageId: message.id,
+      });
+    }
   }
 }
 

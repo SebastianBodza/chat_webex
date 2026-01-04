@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Externalize discord.js and its native dependencies for serverless compatibility
+  serverExternalPackages: [
+    "discord.js",
+    "@discordjs/ws",
+    "@discordjs/voice",
+    "zlib-sync",
+    "bufferutil",
+    "utf-8-validate",
+  ],
 };
 
 export default nextConfig;
