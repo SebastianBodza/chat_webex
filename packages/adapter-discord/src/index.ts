@@ -71,9 +71,9 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   private logger: Logger;
   private formatConverter = new DiscordFormatConverter();
 
-  // Track pending reply context per thread (keyed by threadId)
-  // This enables reply threading when responding to Gateway messages
-  private pendingReplies = new Map<string, string>();
+  // Track pending thread creation context (keyed by channelId:messageId)
+  // When bot responds to a message, we create a Discord thread from that message
+  private pendingThreads = new Map<string, string>();
 
   constructor(
     config: DiscordAdapterConfig & { logger: Logger; userName?: string },
@@ -326,13 +326,42 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   }
 
   /**
-   * Post a message to a Discord channel.
+   * Post a message to a Discord channel or thread.
+   * If responding to a message in a channel (not a thread), creates a Discord thread first.
    */
   async postMessage(
     threadId: string,
     message: AdapterPostableMessage,
   ): Promise<RawMessage<unknown>> {
-    const { channelId } = this.decodeThreadId(threadId);
+    let {
+      channelId,
+      guildId,
+      threadId: discordThreadId,
+    } = this.decodeThreadId(threadId);
+    let actualThreadId = threadId;
+
+    // Check if we need to create a thread (responding to a channel message, not in a thread yet)
+    const pendingKey = this.pendingThreads.get(threadId);
+    if (pendingKey && !discordThreadId) {
+      // Create a Discord thread from the original message
+      const newThread = await this.createDiscordThread(channelId, pendingKey);
+      discordThreadId = newThread.id;
+      channelId = newThread.id; // Thread channel ID becomes the channel to post to
+      actualThreadId = this.encodeThreadId({
+        guildId,
+        channelId: this.decodeThreadId(threadId).channelId,
+        threadId: newThread.id,
+      });
+
+      this.logger.debug("Created Discord thread for response", {
+        originalChannel: this.decodeThreadId(threadId).channelId,
+        threadId: newThread.id,
+        threadName: newThread.name,
+      });
+    } else if (discordThreadId) {
+      // Already in a thread, post to the thread channel
+      channelId = discordThreadId;
+    }
 
     // Build message payload
     const payload: DiscordMessagePayload = {};
@@ -364,18 +393,15 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       payload.components = components;
     }
 
-    // Check for pending reply context (set when handling Gateway messages)
-    const replyToMessageId = this.pendingReplies.get(threadId);
-    if (replyToMessageId) {
-      payload.message_reference = {
-        message_id: replyToMessageId,
-      };
-    }
-
     // Handle file uploads
     const files = extractFiles(message);
     if (files.length > 0) {
-      return this.postMessageWithFiles(channelId, threadId, payload, files);
+      return this.postMessageWithFiles(
+        channelId,
+        actualThreadId,
+        payload,
+        files,
+      );
     }
 
     this.logger.debug("Discord API: POST message", {
@@ -397,14 +423,45 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       messageId: result.id,
     });
 
-    // Store thread root mapping so replies to this message can find the thread
-    await this.storeThreadRootMapping(channelId, result.id, threadId);
-
     return {
       id: result.id,
-      threadId,
+      threadId: actualThreadId,
       raw: result,
     };
+  }
+
+  /**
+   * Create a Discord thread from a message.
+   */
+  private async createDiscordThread(
+    channelId: string,
+    messageId: string,
+  ): Promise<{ id: string; name: string }> {
+    const threadName = `Thread ${new Date().toLocaleString()}`;
+
+    this.logger.debug("Discord API: POST thread", {
+      channelId,
+      messageId,
+      threadName,
+    });
+
+    const response = await this.discordFetch(
+      `/channels/${channelId}/messages/${messageId}/threads`,
+      "POST",
+      {
+        name: threadName,
+        auto_archive_duration: 1440, // 24 hours
+      },
+    );
+
+    const result = (await response.json()) as { id: string; name: string };
+
+    this.logger.debug("Discord API: POST thread response", {
+      threadId: result.id,
+      threadName: result.name,
+    });
+
+    return result;
   }
 
   /**
@@ -416,35 +473,6 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
     // Truncate and add ellipsis
     return `${content.slice(0, DISCORD_MAX_CONTENT_LENGTH - 3)}...`;
-  }
-
-  /**
-   * Store a mapping from a message ID to its thread root.
-   * This enables Slack-like threading where replies continue the conversation.
-   */
-  private async storeThreadRootMapping(
-    channelId: string,
-    messageId: string,
-    threadId: string,
-  ): Promise<void> {
-    if (!this.chat) return;
-
-    // Extract thread root from threadId (format: discord:{guild}:{channel}:{threadRoot})
-    const { threadId: threadRoot } = this.decodeThreadId(threadId);
-    if (!threadRoot) return;
-
-    const refKey = `discord:thread-root:${channelId}:${messageId}`;
-    const state = this.chat.getState();
-
-    // Store for 7 days (conversations rarely last longer)
-    const TTL_MS = 7 * 24 * 60 * 60 * 1000;
-    await state.set(refKey, threadRoot, TTL_MS);
-
-    this.logger.debug("Stored thread root mapping", {
-      messageId,
-      threadRoot,
-      channelId,
-    });
   }
 
   /**
@@ -500,9 +528,6 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
 
     const result = (await response.json()) as APIMessage;
 
-    // Store thread root mapping so replies to this message can find the thread
-    await this.storeThreadRootMapping(channelId, result.id, threadId);
-
     return {
       id: result.id,
       threadId,
@@ -518,7 +543,10 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     messageId: string,
     message: AdapterPostableMessage,
   ): Promise<RawMessage<unknown>> {
-    const { channelId } = this.decodeThreadId(threadId);
+    const { channelId, threadId: discordThreadId } =
+      this.decodeThreadId(threadId);
+    // Use thread channel ID if in a thread, otherwise use channel ID
+    const targetChannelId = discordThreadId || channelId;
 
     // Build message payload
     const payload: DiscordMessagePayload = {};
@@ -551,13 +579,13 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
 
     this.logger.debug("Discord API: PATCH message", {
-      channelId,
+      channelId: targetChannelId,
       messageId,
       contentLength: payload.content?.length || 0,
     });
 
     const response = await this.discordFetch(
-      `/channels/${channelId}/messages/${messageId}`,
+      `/channels/${targetChannelId}/messages/${messageId}`,
       "PATCH",
       payload,
     );
@@ -656,24 +684,34 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   }
 
   /**
-   * Start typing indicator in a Discord channel.
+   * Start typing indicator in a Discord channel or thread.
    */
   async startTyping(threadId: string): Promise<void> {
-    const { channelId } = this.decodeThreadId(threadId);
+    const { channelId, threadId: discordThreadId } =
+      this.decodeThreadId(threadId);
+    // Use thread channel ID if in a thread, otherwise use channel ID
+    const targetChannelId = discordThreadId || channelId;
 
-    this.logger.debug("Discord API: POST typing", { channelId });
+    this.logger.debug("Discord API: POST typing", {
+      channelId: targetChannelId,
+    });
 
-    await this.discordFetch(`/channels/${channelId}/typing`, "POST");
+    await this.discordFetch(`/channels/${targetChannelId}/typing`, "POST");
   }
 
   /**
-   * Fetch messages from a Discord channel.
+   * Fetch messages from a Discord channel or thread.
+   * If threadId includes a Discord thread ID, fetches from that thread channel.
    */
   async fetchMessages(
     threadId: string,
     options: FetchOptions = {},
   ): Promise<FetchResult<unknown>> {
-    const { channelId } = this.decodeThreadId(threadId);
+    const { channelId, threadId: discordThreadId } =
+      this.decodeThreadId(threadId);
+    // Use thread channel ID if in a thread, otherwise use channel ID
+    const targetChannelId = discordThreadId || channelId;
+
     const limit = options.limit || 50;
     const direction = options.direction ?? "backward";
 
@@ -690,14 +728,14 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
 
     this.logger.debug("Discord API: GET messages", {
-      channelId,
+      channelId: targetChannelId,
       limit,
       direction,
       cursor: options.cursor,
     });
 
     const response = await this.discordFetch(
-      `/channels/${channelId}/messages?${params.toString()}`,
+      `/channels/${targetChannelId}/messages?${params.toString()}`,
       "GET",
     );
 
@@ -1126,29 +1164,25 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     const guildId = message.guildId || "@me";
     const channelId = message.channelId;
 
-    // Determine thread root for Slack-like threading behavior:
-    // - If message is a reply, find the thread root from the reference chain
-    // - If message is not a reply, this message becomes the thread root
-    let threadRootId: string | undefined;
+    // Check if this message is in a Discord Thread channel
+    const isInThread = message.channel.isThread();
+    let discordThreadId: string | undefined;
+    let parentChannelId = channelId;
 
-    if (message.reference?.messageId) {
-      // Message is a reply - look up the thread root from state
-      const refKey = `discord:thread-root:${channelId}:${message.reference.messageId}`;
-      const state = this.chat.getState();
-      const storedRoot = await state.get<string>(refKey);
-
-      // If we don't have a mapping, the user replied to an old message
-      // Use the reference message ID as the thread root
-      threadRootId = storedRoot ?? message.reference.messageId;
-    } else {
-      // New message (not a reply) - this message is the thread root
-      threadRootId = message.id;
+    if (
+      isInThread &&
+      "parentId" in message.channel &&
+      message.channel.parentId
+    ) {
+      // Message is in a thread - use the thread channel ID
+      discordThreadId = channelId;
+      parentChannelId = message.channel.parentId;
     }
 
     const threadId = this.encodeThreadId({
       guildId,
-      channelId,
-      threadId: threadRootId,
+      channelId: parentChannelId,
+      threadId: discordThreadId,
     });
 
     // Convert discord.js message to our Message format
@@ -1192,11 +1226,11 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     };
 
     try {
-      // Store thread root mapping for this message so replies can find the thread
-      await this.storeThreadRootMapping(channelId, message.id, threadId);
+      // If not already in a thread, set pending context so postMessage creates one
+      if (!discordThreadId) {
+        this.pendingThreads.set(threadId, message.id);
+      }
 
-      // Set pending reply context so responses are threaded
-      this.pendingReplies.set(threadId, message.id);
       await this.chat.handleIncomingMessage(this, threadId, chatMessage);
     } catch (error) {
       this.logger.error("Error handling Gateway message", {
@@ -1204,8 +1238,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         messageId: message.id,
       });
     } finally {
-      // Clear pending reply context
-      this.pendingReplies.delete(threadId);
+      // Clear pending thread context
+      this.pendingThreads.delete(threadId);
     }
   }
 }
