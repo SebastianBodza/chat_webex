@@ -5,7 +5,6 @@
  * serverless compatibility. Webhook signature verification uses Ed25519.
  */
 
-import { webcrypto } from "node:crypto";
 import {
   extractCard,
   extractFiles,
@@ -35,6 +34,7 @@ import {
   ChannelType,
   InteractionType,
 } from "discord-api-types/v10";
+import { verifyKey } from "discord-interactions";
 import { cardToDiscordPayload, cardToFallbackText } from "./cards";
 import { DiscordFormatConverter } from "./markdown";
 import {
@@ -147,8 +147,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   }
 
   /**
-   * Verify Discord's Ed25519 signature using Web Crypto API.
-   * This matches Discord's official discord-interactions library.
+   * Verify Discord's Ed25519 signature using official discord-interactions library.
    */
   private async verifySignature(
     body: string,
@@ -167,43 +166,22 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     }
 
     try {
-      const message = timestamp + body;
-      const publicKeyHex = this.publicKey;
-      const signatureHex = signature;
-
-      // Convert hex strings to Uint8Array
-      const publicKeyBytes = new Uint8Array(
-        publicKeyHex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [],
-      );
-      const signatureBytes = new Uint8Array(
-        signatureHex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [],
-      );
-
-      // Import the raw Ed25519 public key using Web Crypto API
-      const cryptoKey = await webcrypto.subtle.importKey(
-        "raw",
-        publicKeyBytes,
-        { name: "Ed25519" },
-        false,
-        ["verify"],
-      );
-
-      // Verify the signature
-      const isValid = await webcrypto.subtle.verify(
-        "Ed25519",
-        cryptoKey,
-        signatureBytes,
-        new TextEncoder().encode(message),
+      // Use the official discord-interactions library for verification
+      const isValid = await verifyKey(
+        body,
+        signature,
+        timestamp,
+        this.publicKey,
       );
 
       if (!isValid) {
         this.logger.warn(
           "Discord signature verification failed: invalid signature",
           {
-            publicKeyLength: publicKeyHex.length,
-            signatureLength: signatureHex.length,
-            publicKeyPrefix: publicKeyHex.slice(0, 8),
-            publicKeySuffix: publicKeyHex.slice(-8),
+            publicKeyLength: this.publicKey.length,
+            signatureLength: signature.length,
+            publicKeyPrefix: this.publicKey.slice(0, 8),
+            publicKeySuffix: this.publicKey.slice(-8),
             timestamp,
             bodyLength: body.length,
             bodyPrefix: body.slice(0, 50),

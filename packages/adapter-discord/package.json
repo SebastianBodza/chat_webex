@@ -27,7 +27,8 @@
   "dependencies": {
     "@chat-adapter/shared": "workspace:*",
     "chat": "workspace:*",
-    "discord-api-types": "^0.37.119"
+    "discord-api-types": "^0.37.119",
+    "discord-interactions": "^4.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
