@@ -156,8 +156,6 @@ export interface DiscordMessagePayload {
  * Additional types: ChannelMessageWithSource (4), UpdateMessage (7)
  */
 export enum InteractionResponseType {
-  /** ACK a Ping */
-  Pong = 1,
   /** ACK and edit later (deferred) */
   DeferredChannelMessageWithSource = 5,
   /** ACK component interaction, update message later */

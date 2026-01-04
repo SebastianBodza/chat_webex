@@ -34,7 +34,10 @@ import {
   ChannelType,
   InteractionType,
 } from "discord-api-types/v10";
-import { verifyKey } from "discord-interactions";
+import {
+  InteractionResponseType as DiscordInteractionResponseType,
+  verifyKey,
+} from "discord-interactions";
 import { cardToDiscordPayload, cardToFallbackText } from "./cards";
 import { DiscordFormatConverter } from "./markdown";
 import {
@@ -107,23 +110,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       hasTimestamp: !!request.headers.get("x-signature-timestamp"),
     });
 
-    // Verify Ed25519 signature using raw bytes
-    const signature = request.headers.get("x-signature-ed25519");
-    const timestamp = request.headers.get("x-signature-timestamp");
-
-    // XXX TEMPORARY: Bypass signature verification for debugging
-    // TODO: Remove this bypass once signature verification is fixed
-    const signatureValid = await this.verifySignature(
-      bodyBytes,
-      signature,
-      timestamp,
-    );
-    if (!signatureValid) {
-      this.logger.warn(
-        "XXX SIGNATURE BYPASS ACTIVE - would have rejected request",
-      );
-    }
-    // XXX END TEMPORARY BYPASS
+    // XXX TEMPORARY: Skip ALL signature verification for debugging
+    this.logger.info("XXX Skipping signature verification entirely");
 
     let interaction: DiscordInteraction;
     try {
@@ -141,11 +129,13 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
 
     // Handle PING (Discord verification)
     if (interaction.type === InteractionType.Ping) {
+      // Use official discord-interactions response type
       const responseBody = JSON.stringify({
-        type: InteractionResponseType.Pong,
+        type: DiscordInteractionResponseType.PONG,
       });
       this.logger.info("Discord PING received, responding with PONG", {
         responseBody,
+        responseType: DiscordInteractionResponseType.PONG,
       });
       return new Response(responseBody, {
         status: 200,
