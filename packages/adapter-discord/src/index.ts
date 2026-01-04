@@ -5,7 +5,7 @@
  * serverless compatibility. Webhook signature verification uses Ed25519.
  */
 
-import { verify } from "node:crypto";
+import { webcrypto } from "node:crypto";
 import {
   extractCard,
   extractFiles,
@@ -105,7 +105,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     const signature = request.headers.get("x-signature-ed25519");
     const timestamp = request.headers.get("x-signature-timestamp");
 
-    if (!this.verifySignature(body, signature, timestamp)) {
+    if (!(await this.verifySignature(body, signature, timestamp))) {
       return new Response("Invalid signature", { status: 401 });
     }
 
@@ -147,13 +147,14 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   }
 
   /**
-   * Verify Discord's Ed25519 signature.
+   * Verify Discord's Ed25519 signature using Web Crypto API.
+   * This matches Discord's official discord-interactions library.
    */
-  private verifySignature(
+  private async verifySignature(
     body: string,
     signature: string | null,
     timestamp: string | null,
-  ): boolean {
+  ): Promise<boolean> {
     if (!signature || !timestamp) {
       this.logger.warn(
         "Discord signature verification failed: missing headers",
@@ -170,16 +171,29 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       const publicKeyHex = this.publicKey;
       const signatureHex = signature;
 
-      // Use Node.js crypto for Ed25519 verification
-      const isValid = verify(
-        null, // Ed25519 doesn't use a separate hash algorithm
-        Buffer.from(message),
-        {
-          key: Buffer.from(`302a300506032b6570032100${publicKeyHex}`, "hex"),
-          format: "der",
-          type: "spki",
-        },
-        Buffer.from(signatureHex, "hex"),
+      // Convert hex strings to Uint8Array
+      const publicKeyBytes = new Uint8Array(
+        publicKeyHex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [],
+      );
+      const signatureBytes = new Uint8Array(
+        signatureHex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) ?? [],
+      );
+
+      // Import the raw Ed25519 public key using Web Crypto API
+      const cryptoKey = await webcrypto.subtle.importKey(
+        "raw",
+        publicKeyBytes,
+        { name: "Ed25519" },
+        false,
+        ["verify"],
+      );
+
+      // Verify the signature
+      const isValid = await webcrypto.subtle.verify(
+        "Ed25519",
+        cryptoKey,
+        signatureBytes,
+        new TextEncoder().encode(message),
       );
 
       if (!isValid) {
