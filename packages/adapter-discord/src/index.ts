@@ -71,6 +71,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   private botToken: string;
   private publicKey: string;
   private applicationId: string;
+  private mentionRoleIds: string[];
   private chat: ChatInstance | null = null;
   private logger: Logger;
   private formatConverter = new DiscordFormatConverter();
@@ -81,6 +82,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     this.botToken = config.botToken;
     this.publicKey = config.publicKey.trim().toLowerCase();
     this.applicationId = config.applicationId;
+    this.mentionRoleIds = config.mentionRoleIds ?? [];
     this.botUserId = config.applicationId; // Discord app ID is the bot's user ID
     this.logger = config.logger;
     this.userName = config.userName ?? "bot";
@@ -431,9 +433,15 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       }
     }
 
-    // Check if bot is mentioned
-    const isMentioned =
+    // Check if bot is mentioned (by user ID or configured role IDs)
+    const isUserMentioned =
       data.is_mention || data.mentions.some((m) => m.id === this.applicationId);
+    const isRoleMentioned =
+      this.mentionRoleIds.length > 0 &&
+      data.mention_roles?.some((roleId) =>
+        this.mentionRoleIds.includes(roleId),
+      );
+    const isMentioned = isUserMentioned || isRoleMentioned;
 
     // If mentioned and not in a thread, create one
     if (!discordThreadId && isMentioned) {
@@ -1354,14 +1362,22 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         return;
       }
 
-      // Check if we're mentioned
-      const isMentioned = message.mentions.has(client.user?.id ?? "");
+      // Check if we're mentioned (by user ID or configured role IDs)
+      const isUserMentioned = message.mentions.has(client.user?.id ?? "");
+      const isRoleMentioned =
+        this.mentionRoleIds.length > 0 &&
+        message.mentions.roles.some((role) =>
+          this.mentionRoleIds.includes(role.id),
+        );
+      const isMentioned = isUserMentioned || isRoleMentioned;
 
       this.logger.info("Discord Gateway message received", {
         channelId: message.channelId,
         guildId: message.guildId,
         authorId: message.author.id,
         isMentioned,
+        isUserMentioned,
+        isRoleMentioned,
         content: message.content.slice(0, 100),
       });
 

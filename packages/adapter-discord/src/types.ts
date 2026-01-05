@@ -20,6 +20,8 @@ export interface DiscordAdapterConfig {
   publicKey: string;
   /** Discord application ID */
   applicationId: string;
+  /** Role IDs that should trigger mention handlers (in addition to direct user mentions) */
+  mentionRoleIds?: string[];
 }
 
 /**
@@ -223,6 +225,8 @@ export interface DiscordGatewayMessageData {
   timestamp: string;
   /** Users mentioned in the message */
   mentions: Array<{ id: string; username: string }>;
+  /** Role IDs mentioned in the message */
+  mention_roles?: string[];
   /** File attachments */
   attachments: Array<{
     id: string;

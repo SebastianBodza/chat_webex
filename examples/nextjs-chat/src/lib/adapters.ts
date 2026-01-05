@@ -79,11 +79,17 @@ export function buildAdapters(): Adapters {
     process.env.DISCORD_PUBLIC_KEY &&
     process.env.DISCORD_APPLICATION_ID
   ) {
+    // Parse comma-separated role IDs that should trigger mention handlers
+    const mentionRoleIds = process.env.DISCORD_MENTION_ROLE_IDS
+      ? process.env.DISCORD_MENTION_ROLE_IDS.split(",").map((id) => id.trim())
+      : [];
+
     adapters.discord = withRecording(
       createDiscordAdapter({
         botToken: process.env.DISCORD_BOT_TOKEN,
         publicKey: process.env.DISCORD_PUBLIC_KEY,
         applicationId: process.env.DISCORD_APPLICATION_ID,
+        mentionRoleIds,
         userName: "Chat SDK Bot",
         logger: logger.child("discord"),
       }),
