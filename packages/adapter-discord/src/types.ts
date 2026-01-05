@@ -169,3 +169,96 @@ export interface DiscordInteractionResponse {
   type: InteractionResponseType;
   data?: DiscordMessagePayload;
 }
+
+// ============================================================================
+// Gateway Forwarded Events
+// These types represent Gateway WebSocket events forwarded to the webhook endpoint
+// ============================================================================
+
+/**
+ * Known Gateway event types that have specific handlers.
+ * Other event types are still forwarded but processed generically.
+ */
+export type DiscordGatewayEventType =
+  | "GATEWAY_MESSAGE_CREATE"
+  | "GATEWAY_REACTION_ADD"
+  | "GATEWAY_REACTION_REMOVE"
+  | `GATEWAY_${string}`; // Allow any Gateway event type
+
+/**
+ * A Gateway event forwarded to the webhook endpoint.
+ * All Gateway events are forwarded, even ones without specific handlers.
+ */
+export interface DiscordForwardedEvent {
+  /** Event type identifier (prefixed with GATEWAY_) */
+  type: DiscordGatewayEventType;
+  /** Unix timestamp when the event was received */
+  timestamp: number;
+  /** Event-specific data - structure varies by event type */
+  data: DiscordGatewayMessageData | DiscordGatewayReactionData | unknown;
+}
+
+/**
+ * Message data from a MESSAGE_CREATE Gateway event.
+ */
+export interface DiscordGatewayMessageData {
+  /** Message ID */
+  id: string;
+  /** Channel where the message was sent */
+  channel_id: string;
+  /** Guild ID, or null for DMs */
+  guild_id: string | null;
+  /** Message content */
+  content: string;
+  /** Message author */
+  author: {
+    id: string;
+    username: string;
+    global_name?: string;
+    bot: boolean;
+  };
+  /** ISO timestamp */
+  timestamp: string;
+  /** Users mentioned in the message */
+  mentions: Array<{ id: string; username: string }>;
+  /** File attachments */
+  attachments: Array<{
+    id: string;
+    url: string;
+    filename: string;
+    content_type?: string;
+    size: number;
+  }>;
+  /** Thread info if message is in a thread */
+  thread?: {
+    id: string;
+    parent_id: string;
+  };
+  /** Whether the bot was mentioned */
+  is_mention?: boolean;
+}
+
+/**
+ * Reaction data from REACTION_ADD or REACTION_REMOVE Gateway events.
+ */
+export interface DiscordGatewayReactionData {
+  /** Emoji used for the reaction */
+  emoji: {
+    name: string | null;
+    id: string | null;
+  };
+  /** ID of the message that was reacted to */
+  message_id: string;
+  /** Channel containing the message */
+  channel_id: string;
+  /** Guild ID, or null for DMs */
+  guild_id: string | null;
+  /** User who added/removed the reaction */
+  user_id: string;
+  /** User details */
+  user: {
+    id: string;
+    username: string;
+    bot: boolean;
+  };
+}

@@ -1,0 +1,603 @@
+{
+  "metadata": {
+    "description": "Discord replay test fixtures from SHA 94eb6504",
+    "botId": "1457469483726668048",
+    "guildId": "1457468924290662599",
+    "channelId": "1457510428359004343",
+    "threadId": "1457512653978341593",
+    "userId": "1033044521375764530",
+    "userName": "malte2384"
+  },
+  "buttonClickHello": {
+    "app_permissions": "2248473465835073",
+    "application_id": "1457469483726668048",
+    "attachment_size_limit": 10485760,
+    "authorizing_integration_owners": {
+      "0": "1457468924290662599"
+    },
+    "channel": {
+      "flags": 0,
+      "guild_id": "1457468924290662599",
+      "id": "1457512653978341593",
+      "last_message_id": "1457512694591783107",
+      "member": {
+        "flags": 1,
+        "id": "1457512653978341593",
+        "join_timestamp": "2026-01-04T23:14:56.464000+00:00",
+        "mute_config": null,
+        "muted": false,
+        "user_id": "1033044521375764530"
+      },
+      "member_count": 2,
+      "member_ids_preview": [
+        "1457469483726668048",
+        "1033044521375764530"
+      ],
+      "message_count": 3,
+      "name": "Thread 1/4/2026, 11:14:56 PM",
+      "owner_id": "1457469483726668048",
+      "parent_id": "1457510428359004343",
+      "permissions": "9007199254740991",
+      "rate_limit_per_user": 0,
+      "thread_metadata": {
+        "archive_timestamp": "2026-01-04T23:14:56.415000+00:00",
+        "archived": false,
+        "auto_archive_duration": 1440,
+        "create_timestamp": "2026-01-04T23:14:56.415000+00:00",
+        "locked": false
+      },
+      "total_message_sent": 3,
+      "type": 11
+    },
+    "channel_id": "1457512653978341593",
+    "context": 0,
+    "data": {
+      "component_type": 2,
+      "custom_id": "hello",
+      "id": 2
+    },
+    "entitlement_sku_ids": [],
+    "entitlements": [],
+    "guild": {
+      "features": [],
+      "id": "1457468924290662599",
+      "locale": "en-US"
+    },
+    "guild_id": "1457468924290662599",
+    "guild_locale": "en-US",
+    "id": "1457512716301238422",
+    "locale": "en-US",
+    "member": {
+      "avatar": null,
+      "banner": null,
+      "collectibles": null,
+      "communication_disabled_until": null,
+      "deaf": false,
+      "display_name_styles": null,
+      "flags": 0,
+      "joined_at": "2026-01-04T20:21:10.139000+00:00",
+      "mute": false,
+      "nick": null,
+      "pending": false,
+      "permissions": "9007199254740991",
+      "premium_since": null,
+      "roles": [],
+      "unusual_dm_activity_until": null,
+      "user": {
+        "avatar": "046f57d76d14a232a4ddc7200080de76",
+        "avatar_decoration_data": null,
+        "clan": null,
+        "collectibles": null,
+        "discriminator": "0",
+        "display_name_styles": null,
+        "global_name": "Malte",
+        "id": "1033044521375764530",
+        "primary_guild": null,
+        "public_flags": 0,
+        "username": "malte2384"
+      }
+    },
+    "message": {
+      "attachments": [],
+      "author": {
+        "avatar": null,
+        "avatar_decoration_data": null,
+        "bot": true,
+        "clan": null,
+        "collectibles": null,
+        "discriminator": "6184",
+        "display_name_styles": null,
+        "global_name": null,
+        "id": "1457469483726668048",
+        "primary_guild": null,
+        "public_flags": 524288,
+        "username": "Chat SDK Demo"
+      },
+      "channel_id": "1457512653978341593",
+      "components": [
+        {
+          "components": [
+            {
+              "custom_id": "hello",
+              "id": 2,
+              "label": "Say Hello",
+              "style": 1,
+              "type": 2
+            },
+            {
+              "custom_id": "info",
+              "id": 3,
+              "label": "Show Info",
+              "style": 2,
+              "type": 2
+            },
+            {
+              "custom_id": "messages",
+              "id": 4,
+              "label": "Fetch Messages",
+              "style": 2,
+              "type": 2
+            },
+            {
+              "custom_id": "goodbye",
+              "id": 5,
+              "label": "Goodbye",
+              "style": 4,
+              "type": 2
+            }
+          ],
+          "id": 1,
+          "type": 1
+        }
+      ],
+      "content": "**👋 Welcome!**\n\nConnected via discord\n\nI'm now listening to this thread.",
+      "edited_timestamp": null,
+      "embeds": [
+        {
+          "color": 5793266,
+          "content_scan_version": 0,
+          "description": "Connected via discord\n\nI'm now listening to this thread.",
+          "fields": [
+            {
+              "inline": true,
+              "name": "DM Support",
+              "value": "No"
+            },
+            {
+              "inline": true,
+              "name": "Platform",
+              "value": "discord"
+            }
+          ],
+          "id": "1457512657933303966",
+          "title": "👋 Welcome!",
+          "type": "rich"
+        }
+      ],
+      "flags": 0,
+      "id": "1457512657933303965",
+      "mention_everyone": false,
+      "mention_roles": [],
+      "mentions": [],
+      "pinned": false,
+      "timestamp": "2026-01-04T23:14:56.927000+00:00",
+      "tts": false,
+      "type": 0
+    },
+    "token": "interaction_token_hello",
+    "type": 3,
+    "version": 1
+  },
+  "buttonClickMessages": {
+    "app_permissions": "2248473465835073",
+    "application_id": "1457469483726668048",
+    "attachment_size_limit": 10485760,
+    "authorizing_integration_owners": {
+      "0": "1457468924290662599"
+    },
+    "channel": {
+      "flags": 0,
+      "guild_id": "1457468924290662599",
+      "id": "1457512653978341593",
+      "last_message_id": "1457512728322244708",
+      "member": {
+        "flags": 1,
+        "id": "1457512653978341593",
+        "join_timestamp": "2026-01-04T23:14:56.464000+00:00"
+      },
+      "member_count": 2,
+      "message_count": 4,
+      "name": "Thread 1/4/2026, 11:14:56 PM",
+      "owner_id": "1457469483726668048",
+      "parent_id": "1457510428359004343",
+      "permissions": "9007199254740991",
+      "rate_limit_per_user": 0,
+      "thread_metadata": {
+        "archive_timestamp": "2026-01-04T23:14:56.415000+00:00",
+        "archived": false,
+        "auto_archive_duration": 1440,
+        "create_timestamp": "2026-01-04T23:14:56.415000+00:00",
+        "locked": false
+      },
+      "total_message_sent": 4,
+      "type": 11
+    },
+    "channel_id": "1457512653978341593",
+    "context": 0,
+    "data": {
+      "component_type": 2,
+      "custom_id": "messages",
+      "id": 4
+    },
+    "entitlement_sku_ids": [],
+    "entitlements": [],
+    "guild": {
+      "features": [],
+      "id": "1457468924290662599",
+      "locale": "en-US"
+    },
+    "guild_id": "1457468924290662599",
+    "guild_locale": "en-US",
+    "id": "1457512736685686915",
+    "locale": "en-US",
+    "member": {
+      "avatar": null,
+      "banner": null,
+      "flags": 0,
+      "joined_at": "2026-01-04T20:21:10.139000+00:00",
+      "mute": false,
+      "nick": null,
+      "pending": false,
+      "permissions": "9007199254740991",
+      "premium_since": null,
+      "roles": [],
+      "user": {
+        "avatar": "046f57d76d14a232a4ddc7200080de76",
+        "discriminator": "0",
+        "global_name": "Malte",
+        "id": "1033044521375764530",
+        "username": "malte2384"
+      }
+    },
+    "message": {
+      "attachments": [],
+      "author": {
+        "avatar": null,
+        "bot": true,
+        "discriminator": "6184",
+        "global_name": null,
+        "id": "1457469483726668048",
+        "username": "Chat SDK Demo"
+      },
+      "channel_id": "1457512653978341593",
+      "components": [
+        {
+          "components": [
+            {
+              "custom_id": "hello",
+              "id": 2,
+              "label": "Say Hello",
+              "style": 1,
+              "type": 2
+            },
+            {
+              "custom_id": "info",
+              "id": 3,
+              "label": "Show Info",
+              "style": 2,
+              "type": 2
+            },
+            {
+              "custom_id": "messages",
+              "id": 4,
+              "label": "Fetch Messages",
+              "style": 2,
+              "type": 2
+            },
+            {
+              "custom_id": "goodbye",
+              "id": 5,
+              "label": "Goodbye",
+              "style": 4,
+              "type": 2
+            }
+          ],
+          "id": 1,
+          "type": 1
+        }
+      ],
+      "content": "**👋 Welcome!**\n\nConnected via discord",
+      "edited_timestamp": null,
+      "embeds": [],
+      "flags": 0,
+      "id": "1457512657933303965",
+      "mention_everyone": false,
+      "mention_roles": [],
+      "mentions": [],
+      "pinned": false,
+      "timestamp": "2026-01-04T23:14:56.927000+00:00",
+      "tts": false,
+      "type": 0
+    },
+    "token": "interaction_token_messages",
+    "type": 3,
+    "version": 1
+  },
+  "buttonClickInfo": {
+    "app_permissions": "2248473465835073",
+    "application_id": "1457469483726668048",
+    "channel": {
+      "flags": 0,
+      "guild_id": "1457468924290662599",
+      "id": "1457512653978341593",
+      "member_count": 2,
+      "name": "Thread 1/4/2026, 11:14:56 PM",
+      "owner_id": "1457469483726668048",
+      "parent_id": "1457510428359004343",
+      "type": 11
+    },
+    "channel_id": "1457512653978341593",
+    "context": 0,
+    "data": {
+      "component_type": 2,
+      "custom_id": "info",
+      "id": 3
+    },
+    "entitlements": [],
+    "guild": {
+      "features": [],
+      "id": "1457468924290662599",
+      "locale": "en-US"
+    },
+    "guild_id": "1457468924290662599",
+    "guild_locale": "en-US",
+    "id": "1457512750000000001",
+    "locale": "en-US",
+    "member": {
+      "avatar": null,
+      "flags": 0,
+      "joined_at": "2026-01-04T20:21:10.139000+00:00",
+      "nick": null,
+      "pending": false,
+      "permissions": "9007199254740991",
+      "roles": [],
+      "user": {
+        "avatar": "046f57d76d14a232a4ddc7200080de76",
+        "discriminator": "0",
+        "global_name": "Malte",
+        "id": "1033044521375764530",
+        "username": "malte2384"
+      }
+    },
+    "message": {
+      "attachments": [],
+      "author": {
+        "avatar": null,
+        "bot": true,
+        "discriminator": "6184",
+        "id": "1457469483726668048",
+        "username": "Chat SDK Demo"
+      },
+      "channel_id": "1457512653978341593",
+      "components": [
+        {
+          "components": [
+            {"custom_id": "hello", "label": "Say Hello", "style": 1, "type": 2},
+            {"custom_id": "info", "label": "Show Info", "style": 2, "type": 2},
+            {"custom_id": "messages", "label": "Fetch Messages", "style": 2, "type": 2},
+            {"custom_id": "goodbye", "label": "Goodbye", "style": 4, "type": 2}
+          ],
+          "type": 1
+        }
+      ],
+      "content": "Welcome!",
+      "id": "1457512657933303965",
+      "type": 0
+    },
+    "token": "interaction_token_info",
+    "type": 3,
+    "version": 1
+  },
+  "buttonClickGoodbye": {
+    "app_permissions": "2248473465835073",
+    "application_id": "1457469483726668048",
+    "channel": {
+      "flags": 0,
+      "guild_id": "1457468924290662599",
+      "id": "1457512653978341593",
+      "member_count": 2,
+      "name": "Thread 1/4/2026, 11:14:56 PM",
+      "owner_id": "1457469483726668048",
+      "parent_id": "1457510428359004343",
+      "type": 11
+    },
+    "channel_id": "1457512653978341593",
+    "context": 0,
+    "data": {
+      "component_type": 2,
+      "custom_id": "goodbye",
+      "id": 5
+    },
+    "entitlements": [],
+    "guild": {
+      "features": [],
+      "id": "1457468924290662599",
+      "locale": "en-US"
+    },
+    "guild_id": "1457468924290662599",
+    "guild_locale": "en-US",
+    "id": "1457512760000000002",
+    "locale": "en-US",
+    "member": {
+      "avatar": null,
+      "flags": 0,
+      "joined_at": "2026-01-04T20:21:10.139000+00:00",
+      "nick": null,
+      "pending": false,
+      "permissions": "9007199254740991",
+      "roles": [],
+      "user": {
+        "avatar": "046f57d76d14a232a4ddc7200080de76",
+        "discriminator": "0",
+        "global_name": "Malte",
+        "id": "1033044521375764530",
+        "username": "malte2384"
+      }
+    },
+    "message": {
+      "attachments": [],
+      "author": {
+        "avatar": null,
+        "bot": true,
+        "discriminator": "6184",
+        "id": "1457469483726668048",
+        "username": "Chat SDK Demo"
+      },
+      "channel_id": "1457512653978341593",
+      "components": [
+        {
+          "components": [
+            {"custom_id": "hello", "label": "Say Hello", "style": 1, "type": 2},
+            {"custom_id": "info", "label": "Show Info", "style": 2, "type": 2},
+            {"custom_id": "messages", "label": "Fetch Messages", "style": 2, "type": 2},
+            {"custom_id": "goodbye", "label": "Goodbye", "style": 4, "type": 2}
+          ],
+          "type": 1
+        }
+      ],
+      "content": "Welcome!",
+      "id": "1457512657933303965",
+      "type": 0
+    },
+    "token": "interaction_token_goodbye",
+    "type": 3,
+    "version": 1
+  },
+  "dmButtonClick": {
+    "app_permissions": "2248473465835073",
+    "application_id": "1457469483726668048",
+    "attachment_size_limit": 10485760,
+    "channel": {
+      "flags": 0,
+      "id": "DM_CHANNEL_123",
+      "last_message_id": "MSG789",
+      "type": 1
+    },
+    "channel_id": "DM_CHANNEL_123",
+    "context": 1,
+    "data": {
+      "component_type": 2,
+      "custom_id": "dm-action",
+      "id": 2
+    },
+    "entitlement_sku_ids": [],
+    "entitlements": [],
+    "id": "INTERACTION789",
+    "locale": "en-US",
+    "user": {
+      "avatar": "046f57d76d14a232a4ddc7200080de76",
+      "discriminator": "0",
+      "global_name": "Malte",
+      "id": "1033044521375764530",
+      "username": "malte2384"
+    },
+    "message": {
+      "attachments": [],
+      "author": {
+        "avatar": null,
+        "bot": true,
+        "discriminator": "6184",
+        "global_name": null,
+        "id": "1457469483726668048",
+        "username": "Chat SDK Demo"
+      },
+      "channel_id": "DM_CHANNEL_123",
+      "components": [
+        {
+          "components": [
+            {"custom_id": "dm-action", "label": "DM Action", "style": 1, "type": 2}
+          ],
+          "type": 1
+        }
+      ],
+      "content": "DM message",
+      "id": "MSG_DM_123",
+      "type": 0
+    },
+    "token": "interaction_token_dm",
+    "type": 3,
+    "version": 1
+  },
+  "differentUser": {
+    "app_permissions": "2248473465835073",
+    "application_id": "1457469483726668048",
+    "channel": {
+      "flags": 0,
+      "guild_id": "1457468924290662599",
+      "id": "1457512653978341593",
+      "member_count": 2,
+      "name": "Thread 1/4/2026, 11:14:56 PM",
+      "owner_id": "1457469483726668048",
+      "parent_id": "1457510428359004343",
+      "type": 11
+    },
+    "channel_id": "1457512653978341593",
+    "context": 0,
+    "data": {
+      "component_type": 2,
+      "custom_id": "hello",
+      "id": 2
+    },
+    "entitlements": [],
+    "guild": {
+      "features": [],
+      "id": "1457468924290662599",
+      "locale": "en-US"
+    },
+    "guild_id": "1457468924290662599",
+    "guild_locale": "en-US",
+    "id": "1457512770000000003",
+    "locale": "en-US",
+    "member": {
+      "avatar": null,
+      "flags": 0,
+      "joined_at": "2026-01-04T20:00:00.000000+00:00",
+      "nick": "Different Nick",
+      "pending": false,
+      "permissions": "9007199254740991",
+      "roles": [],
+      "user": {
+        "avatar": "different_avatar",
+        "discriminator": "0",
+        "global_name": "Alice",
+        "id": "9876543210987654321",
+        "username": "alice123"
+      }
+    },
+    "message": {
+      "attachments": [],
+      "author": {
+        "avatar": null,
+        "bot": true,
+        "discriminator": "6184",
+        "id": "1457469483726668048",
+        "username": "Chat SDK Demo"
+      },
+      "channel_id": "1457512653978341593",
+      "components": [
+        {
+          "components": [
+            {"custom_id": "hello", "label": "Say Hello", "style": 1, "type": 2}
+          ],
+          "type": 1
+        }
+      ],
+      "content": "Welcome!",
+      "id": "1457512657933303965",
+      "type": 0
+    },
+    "token": "interaction_token_alice",
+    "type": 3,
+    "version": 1
+  }
+}

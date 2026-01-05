@@ -7,6 +7,10 @@
 
 import { createHmac } from "node:crypto";
 import {
+  createDiscordAdapter,
+  type DiscordAdapter,
+} from "@chat-adapter/discord";
+import {
   createGoogleChatAdapter,
   type GoogleChatAdapter,
 } from "@chat-adapter/gchat";
@@ -22,6 +26,16 @@ import {
   type Thread,
 } from "chat";
 import type { Mock } from "vitest";
+import {
+  createMockDiscordApi,
+  DISCORD_APPLICATION_ID,
+  DISCORD_BOT_TOKEN,
+  DISCORD_BOT_USERNAME,
+  DISCORD_PUBLIC_KEY,
+  type MockDiscordApi,
+  restoreDiscordFetchMock,
+  setupDiscordFetchMock,
+} from "./discord-utils";
 import {
   createMockGoogleChatApi,
   GCHAT_TEST_CREDENTIALS,
@@ -653,4 +667,107 @@ export function expectUpdatedMessage(
       }),
     );
   }
+}
+
+// ============================================================================
+// Discord Test Context
+// ============================================================================
+
+export interface DiscordTestContext {
+  chat: Chat<{ discord: DiscordAdapter }>;
+  adapter: DiscordAdapter;
+  mockApi: MockDiscordApi;
+  tracker: ReturnType<typeof createWaitUntilTracker>;
+  captured: CapturedMessages;
+  sendWebhook: (fixture: unknown) => Promise<Response>;
+  cleanup: () => void;
+}
+
+/**
+ * Create a Discord test context with standard setup.
+ */
+export function createDiscordTestContext(
+  fixtures: { botName?: string; applicationId?: string },
+  handlers: {
+    onMention?: (thread: Thread, message: Message) => Promise<void>;
+    onSubscribed?: (thread: Thread, message: Message) => Promise<void>;
+    onAction?: (event: ActionEvent) => Promise<void>;
+    onReaction?: (event: ReactionEvent) => Promise<void>;
+  },
+): DiscordTestContext {
+  const applicationId = fixtures.applicationId || DISCORD_APPLICATION_ID;
+  const botName = fixtures.botName || DISCORD_BOT_USERNAME;
+
+  const adapter = createDiscordAdapter({
+    botToken: DISCORD_BOT_TOKEN,
+    publicKey: DISCORD_PUBLIC_KEY,
+    applicationId,
+    userName: botName,
+    logger: mockLogger,
+  });
+
+  const mockApi = createMockDiscordApi();
+  setupDiscordFetchMock(mockApi);
+
+  const chat = new Chat({
+    userName: botName,
+    adapters: { discord: adapter },
+    state: createMemoryState(),
+    logger: "error",
+  });
+
+  const captured: CapturedMessages = {
+    mentionMessage: null,
+    mentionThread: null,
+    followUpMessage: null,
+    followUpThread: null,
+  };
+
+  if (handlers.onMention) {
+    const handler = handlers.onMention;
+    chat.onNewMention(async (thread, message) => {
+      captured.mentionMessage = message;
+      captured.mentionThread = thread;
+      await handler(thread, message);
+    });
+  }
+
+  if (handlers.onSubscribed) {
+    const handler = handlers.onSubscribed;
+    chat.onSubscribedMessage(async (thread, message) => {
+      captured.followUpMessage = message;
+      captured.followUpThread = thread;
+      await handler(thread, message);
+    });
+  }
+
+  if (handlers.onAction) {
+    chat.onAction(handlers.onAction);
+  }
+
+  if (handlers.onReaction) {
+    chat.onReaction(handlers.onReaction);
+  }
+
+  const tracker = createWaitUntilTracker();
+
+  return {
+    chat,
+    adapter,
+    mockApi,
+    tracker,
+    captured,
+    sendWebhook: async (fixture: unknown) => {
+      const { createDiscordWebhookRequest } = await import("./discord-utils");
+      const response = await chat.webhooks.discord(
+        createDiscordWebhookRequest(fixture as Record<string, unknown>),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+      return response;
+    },
+    cleanup: () => {
+      restoreDiscordFetchMock();
+    },
+  };
 }

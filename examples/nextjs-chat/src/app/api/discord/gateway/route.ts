@@ -1,7 +1,6 @@
 import { after } from "next/server";
 import { createClient } from "redis";
 import { bot } from "@/lib/bot";
-import { recorder } from "@/lib/recorder";
 
 export const maxDuration = 800;
 
@@ -42,14 +41,6 @@ export async function POST(request: Request): Promise<Response> {
   // Cap at 10 minutes to avoid runaway costs
   const maxDurationMs = 600 * 1000;
   const actualDuration = Math.min(durationMs, maxDurationMs);
-
-  // Create Gateway event recorder callback
-  const onGatewayEvent = recorder.isEnabled
-    ? (eventType: string, data: unknown) => {
-        // Fire and forget - don't block message handling
-        recorder.recordGatewayEvent("discord", eventType, data).catch(() => {});
-      }
-    : undefined;
 
   // Set up Redis pub/sub for listener coordination
   let abortController: AbortController | undefined;
@@ -108,15 +99,32 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
+  // Construct webhook URL for forwarding Gateway events
+  // Use production URL if available, otherwise fall back to VERCEL_URL
+  const baseUrl =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL;
+  let webhookUrl: string | undefined;
+  if (baseUrl) {
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    const queryParam = bypassSecret
+      ? `?x-vercel-protection-bypass=${bypassSecret}`
+      : "";
+    webhookUrl = `https://${baseUrl}/api/webhooks/discord${queryParam}`;
+  }
+
   try {
-    console.log(`[discord-gateway] Calling startGatewayListener`);
+    console.log(`[discord-gateway] Calling startGatewayListener`, {
+      webhookUrl: webhookUrl ? "configured" : "not configured",
+    });
     const response = await discord.startGatewayListener(
       {
         waitUntil: (task: Promise<unknown>) => after(() => task),
       },
       actualDuration,
-      onGatewayEvent,
       abortController?.signal,
+      webhookUrl,
     );
     console.log(
       `[discord-gateway] startGatewayListener returned status: ${response.status}`,

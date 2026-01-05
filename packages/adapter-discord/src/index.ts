@@ -49,6 +49,10 @@ import { DiscordFormatConverter } from "./markdown";
 import {
   type DiscordActionRow,
   type DiscordAdapterConfig,
+  type DiscordForwardedEvent,
+  type DiscordGatewayEventType,
+  type DiscordGatewayMessageData,
+  type DiscordGatewayReactionData,
   type DiscordInteraction,
   type DiscordInteractionResponse,
   type DiscordMessagePayload,
@@ -100,7 +104,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
   }
 
   /**
-   * Handle incoming Discord webhook (HTTP Interactions).
+   * Handle incoming Discord webhook (HTTP Interactions or forwarded Gateway events).
    */
   async handleWebhook(
     request: Request,
@@ -110,6 +114,22 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     const bodyBuffer = await request.arrayBuffer();
     const bodyBytes = new Uint8Array(bodyBuffer);
     const body = new TextDecoder().decode(bodyBytes);
+
+    // Check if this is a forwarded Gateway event (uses bot token for auth)
+    const gatewayToken = request.headers.get("x-discord-gateway-token");
+    if (gatewayToken) {
+      if (gatewayToken !== this.botToken) {
+        this.logger.warn("Invalid gateway token");
+        return new Response("Invalid gateway token", { status: 401 });
+      }
+      this.logger.info("Discord forwarded Gateway event received");
+      try {
+        const event = JSON.parse(body) as DiscordForwardedEvent;
+        return this.handleForwardedGatewayEvent(event, options);
+      } catch {
+        return new Response("Invalid JSON", { status: 400 });
+      }
+    }
 
     this.logger.info("Discord webhook received", {
       bodyLength: body.length,
@@ -319,6 +339,180 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     });
 
     this.chat.processAction(actionEvent, options);
+  }
+
+  /**
+   * Handle a forwarded Gateway event received via webhook.
+   */
+  private async handleForwardedGatewayEvent(
+    event: DiscordForwardedEvent,
+    options?: WebhookOptions,
+  ): Promise<Response> {
+    this.logger.info("Processing forwarded Gateway event", {
+      type: event.type,
+      timestamp: event.timestamp,
+    });
+
+    switch (event.type) {
+      case "GATEWAY_MESSAGE_CREATE":
+        await this.handleForwardedMessage(
+          event.data as DiscordGatewayMessageData,
+          options,
+        );
+        break;
+      case "GATEWAY_REACTION_ADD":
+        await this.handleForwardedReaction(
+          event.data as DiscordGatewayReactionData,
+          true,
+          options,
+        );
+        break;
+      case "GATEWAY_REACTION_REMOVE":
+        await this.handleForwardedReaction(
+          event.data as DiscordGatewayReactionData,
+          false,
+          options,
+        );
+        break;
+      default:
+        this.logger.warn("Unknown forwarded Gateway event type", {
+          type: event.type,
+        });
+    }
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /**
+   * Handle a forwarded MESSAGE_CREATE event.
+   */
+  private async handleForwardedMessage(
+    data: DiscordGatewayMessageData,
+    _options?: WebhookOptions,
+  ): Promise<void> {
+    if (!this.chat) return;
+
+    const guildId = data.guild_id || "@me";
+    const channelId = data.channel_id;
+
+    // Use thread info if provided, otherwise use channel
+    let discordThreadId: string | undefined;
+    let parentChannelId = channelId;
+
+    if (data.thread) {
+      discordThreadId = data.thread.id;
+      parentChannelId = data.thread.parent_id;
+    }
+
+    // Check if bot is mentioned
+    const isMentioned =
+      data.is_mention || data.mentions.some((m) => m.id === this.applicationId);
+
+    // If mentioned and not in a thread, create one
+    if (!discordThreadId && isMentioned) {
+      try {
+        const newThread = await this.createDiscordThread(channelId, data.id);
+        discordThreadId = newThread.id;
+        this.logger.debug("Created Discord thread for forwarded mention", {
+          channelId,
+          messageId: data.id,
+          threadId: newThread.id,
+        });
+      } catch (error) {
+        this.logger.error("Failed to create Discord thread for mention", {
+          error: String(error),
+          messageId: data.id,
+        });
+      }
+    }
+
+    const threadId = this.encodeThreadId({
+      guildId,
+      channelId: parentChannelId,
+      threadId: discordThreadId,
+    });
+
+    // Convert to SDK Message format
+    const chatMessage: Message = {
+      id: data.id,
+      threadId,
+      text: data.content,
+      formatted: this.formatConverter.toAst(data.content),
+      author: {
+        userId: data.author.id,
+        userName: data.author.username,
+        fullName: data.author.global_name || data.author.username,
+        isBot: data.author.bot,
+        isMe: false,
+      },
+      metadata: {
+        dateSent: new Date(data.timestamp),
+        edited: false,
+      },
+      attachments: data.attachments.map((a) => ({
+        type: this.getAttachmentType(a.content_type),
+        url: a.url,
+        name: a.filename,
+        mimeType: a.content_type,
+        size: a.size,
+      })),
+      raw: data,
+      isMention: isMentioned,
+    };
+
+    try {
+      await this.chat.handleIncomingMessage(this, threadId, chatMessage);
+    } catch (error) {
+      this.logger.error("Error handling forwarded message", {
+        error: String(error),
+        messageId: data.id,
+      });
+    }
+  }
+
+  /**
+   * Handle a forwarded REACTION_ADD or REACTION_REMOVE event.
+   */
+  private async handleForwardedReaction(
+    data: DiscordGatewayReactionData,
+    added: boolean,
+    _options?: WebhookOptions,
+  ): Promise<void> {
+    if (!this.chat) return;
+
+    const guildId = data.guild_id || "@me";
+    const channelId = data.channel_id;
+
+    const threadId = this.encodeThreadId({
+      guildId,
+      channelId,
+    });
+
+    // Normalize emoji
+    const emojiName = data.emoji.name || "unknown";
+    const normalizedEmoji = this.normalizeDiscordEmoji(emojiName);
+
+    const reactionEvent = {
+      adapter: this as Adapter,
+      threadId,
+      messageId: data.message_id,
+      emoji: normalizedEmoji,
+      rawEmoji: data.emoji.id ? `<:${emojiName}:${data.emoji.id}>` : emojiName,
+      added,
+      user: {
+        userId: data.user.id,
+        userName: data.user.username,
+        fullName: data.user.username,
+        isBot: data.user.bot,
+        isMe: false,
+      },
+      raw: data,
+    };
+
+    this.chat.processReaction(reactionEvent);
   }
 
   /**
@@ -961,15 +1155,15 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
    *
    * @param options - Webhook options with waitUntil function
    * @param durationMs - How long to keep listening (default: 180000ms = 3 minutes)
-   * @param onGatewayEvent - Optional callback for recording/logging Gateway events
    * @param abortSignal - Optional AbortSignal to stop the listener early (e.g., when a new listener starts)
+   * @param webhookUrl - URL to forward Gateway events to (required for webhook forwarding mode)
    * @returns Response indicating the listener was started
    */
   async startGatewayListener(
     options: WebhookOptions,
     durationMs = 180000,
-    onGatewayEvent?: (eventType: string, data: unknown) => void,
     abortSignal?: AbortSignal,
+    webhookUrl?: string,
   ): Promise<Response> {
     if (!this.chat) {
       return new Response("Chat instance not initialized", { status: 500 });
@@ -979,13 +1173,16 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       return new Response("waitUntil not provided", { status: 500 });
     }
 
-    this.logger.info("Starting Discord Gateway listener", { durationMs });
+    this.logger.info("Starting Discord Gateway listener", {
+      durationMs,
+      webhookUrl: webhookUrl ? "configured" : "not configured",
+    });
 
     // Create a promise that resolves after the duration
     const listenerPromise = this.runGatewayListener(
       durationMs,
-      onGatewayEvent,
       abortSignal,
+      webhookUrl,
     );
 
     // Use waitUntil to keep the function alive
@@ -1009,8 +1206,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
    */
   private async runGatewayListener(
     durationMs: number,
-    onGatewayEvent?: (eventType: string, data: unknown) => void,
     abortSignal?: AbortSignal,
+    webhookUrl?: string,
   ): Promise<void> {
     const client = new Client({
       intents: [
@@ -1025,150 +1222,28 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
 
     let isShuttingDown = false;
 
-    // Set up message handler
-    client.on(Events.MessageCreate, async (message: DiscordJsMessage) => {
-      if (isShuttingDown) {
-        this.logger.debug("Ignoring message - Gateway is shutting down");
-        return;
-      }
+    // When webhookUrl is provided, use raw forwarding for ALL events
+    // This keeps the Gateway simple - all processing happens in the webhook
+    if (webhookUrl) {
+      client.on("raw", async (packet: { t: string | null; d: unknown }) => {
+        if (isShuttingDown) return;
+        if (!packet.t) return; // Skip heartbeats and other non-dispatch events
 
-      // Ignore messages from bots (including ourselves)
-      if (message.author.bot) {
-        this.logger.debug("Ignoring message from bot", {
-          authorId: message.author.id,
-          authorName: message.author.username,
-          isMe: message.author.id === client.user?.id,
+        this.logger.info("Discord Gateway forwarding event", {
+          type: packet.t,
         });
-        return;
-      }
 
-      // Check if we're mentioned
-      const isMentioned = message.mentions.has(client.user?.id ?? "");
-
-      this.logger.info("Discord Gateway message received", {
-        channelId: message.channelId,
-        guildId: message.guildId,
-        authorId: message.author.id,
-        isMentioned,
-        content: message.content.slice(0, 100),
+        // Forward to webhook
+        await this.forwardGatewayEvent(webhookUrl, {
+          type: `GATEWAY_${packet.t}` as DiscordGatewayEventType,
+          timestamp: Date.now(),
+          data: packet.d,
+        });
       });
-
-      // Record the Gateway event if callback provided
-      if (onGatewayEvent) {
-        onGatewayEvent("MESSAGE_CREATE", {
-          id: message.id,
-          channel_id: message.channelId,
-          guild_id: message.guildId,
-          content: message.content,
-          author: {
-            id: message.author.id,
-            username: message.author.username,
-            bot: message.author.bot,
-          },
-          timestamp: message.createdAt.toISOString(),
-          mentions: message.mentions.users.map((u) => ({
-            id: u.id,
-            username: u.username,
-          })),
-          attachments: message.attachments.map((a) => ({
-            id: a.id,
-            filename: a.name,
-            url: a.url,
-            content_type: a.contentType,
-            size: a.size,
-          })),
-        });
-      }
-
-      // Process the message through our chat handlers
-      await this.handleGatewayMessage(message, isMentioned);
-    });
-
-    // Set up reaction add handler
-    client.on(Events.MessageReactionAdd, async (reaction, user) => {
-      if (isShuttingDown) {
-        this.logger.debug("Ignoring reaction - Gateway is shutting down");
-        return;
-      }
-
-      // Ignore reactions from bots (including ourselves)
-      if (user.bot) {
-        this.logger.debug("Ignoring reaction from bot", {
-          userId: user.id,
-          isMe: user.id === client.user?.id,
-        });
-        return;
-      }
-
-      this.logger.info("Discord Gateway reaction added", {
-        emoji: reaction.emoji.name,
-        messageId: reaction.message.id,
-        channelId: reaction.message.channelId,
-        userId: user.id,
-      });
-
-      // Record the Gateway event if callback provided
-      if (onGatewayEvent) {
-        onGatewayEvent("MESSAGE_REACTION_ADD", {
-          emoji: {
-            name: reaction.emoji.name,
-            id: reaction.emoji.id,
-          },
-          message_id: reaction.message.id,
-          channel_id: reaction.message.channelId,
-          guild_id: reaction.message.guildId,
-          user_id: user.id,
-        });
-      }
-
-      // Process the reaction (skip partial users without username)
-      if (user.username) {
-        await this.handleGatewayReaction(reaction, user as { id: string; username: string; bot: boolean }, true);
-      }
-    });
-
-    // Set up reaction remove handler
-    client.on(Events.MessageReactionRemove, async (reaction, user) => {
-      if (isShuttingDown) {
-        this.logger.debug("Ignoring reaction removal - Gateway is shutting down");
-        return;
-      }
-
-      // Ignore reactions from bots (including ourselves)
-      if (user.bot) {
-        this.logger.debug("Ignoring reaction removal from bot", {
-          userId: user.id,
-          isMe: user.id === client.user?.id,
-        });
-        return;
-      }
-
-      this.logger.info("Discord Gateway reaction removed", {
-        emoji: reaction.emoji.name,
-        messageId: reaction.message.id,
-        channelId: reaction.message.channelId,
-        userId: user.id,
-      });
-
-      // Record the Gateway event if callback provided
-      if (onGatewayEvent) {
-        onGatewayEvent("MESSAGE_REACTION_REMOVE", {
-          emoji: {
-            name: reaction.emoji.name,
-            id: reaction.emoji.id,
-          },
-          message_id: reaction.message.id,
-          channel_id: reaction.message.channelId,
-          guild_id: reaction.message.guildId,
-          user_id: user.id,
-        });
-      }
-
-      // Process the reaction (skip partial users without username)
-      if (user.username) {
-        await this.handleGatewayReaction(reaction, user as { id: string; username: string; bot: boolean }, false);
-      }
-    });
+    } else {
+      // Legacy mode: handle events directly without webhook forwarding
+      this.setupLegacyGatewayHandlers(client, () => isShuttingDown);
+    }
 
     client.on(Events.ClientReady, () => {
       this.logger.info("Discord Gateway connected", {
@@ -1221,6 +1296,156 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       isShuttingDown = true;
       client.destroy();
       this.logger.info("Discord Gateway listener stopped");
+    }
+  }
+
+  /**
+   * Set up legacy Gateway handlers for direct processing (when webhookUrl is not provided).
+   */
+  private setupLegacyGatewayHandlers(
+    client: Client,
+    isShuttingDown: () => boolean,
+  ): void {
+    // Message handler
+    client.on(Events.MessageCreate, async (message: DiscordJsMessage) => {
+      if (isShuttingDown()) {
+        this.logger.debug("Ignoring message - Gateway is shutting down");
+        return;
+      }
+
+      // Ignore messages from bots (including ourselves)
+      if (message.author.bot) {
+        this.logger.debug("Ignoring message from bot", {
+          authorId: message.author.id,
+          authorName: message.author.username,
+          isMe: message.author.id === client.user?.id,
+        });
+        return;
+      }
+
+      // Check if we're mentioned
+      const isMentioned = message.mentions.has(client.user?.id ?? "");
+
+      this.logger.info("Discord Gateway message received", {
+        channelId: message.channelId,
+        guildId: message.guildId,
+        authorId: message.author.id,
+        isMentioned,
+        content: message.content.slice(0, 100),
+      });
+
+      // Process the message directly
+      await this.handleGatewayMessage(message, isMentioned);
+    });
+
+    // Reaction add handler
+    client.on(Events.MessageReactionAdd, async (reaction, user) => {
+      if (isShuttingDown()) {
+        this.logger.debug("Ignoring reaction - Gateway is shutting down");
+        return;
+      }
+
+      // Ignore reactions from bots (including ourselves)
+      if (user.bot) {
+        this.logger.debug("Ignoring reaction from bot", {
+          userId: user.id,
+          isMe: user.id === client.user?.id,
+        });
+        return;
+      }
+
+      this.logger.info("Discord Gateway reaction added", {
+        emoji: reaction.emoji.name,
+        messageId: reaction.message.id,
+        channelId: reaction.message.channelId,
+        userId: user.id,
+      });
+
+      // Process the reaction (skip partial users without username)
+      if (user.username) {
+        await this.handleGatewayReaction(
+          reaction,
+          user as { id: string; username: string; bot: boolean },
+          true,
+        );
+      }
+    });
+
+    // Reaction remove handler
+    client.on(Events.MessageReactionRemove, async (reaction, user) => {
+      if (isShuttingDown()) {
+        this.logger.debug(
+          "Ignoring reaction removal - Gateway is shutting down",
+        );
+        return;
+      }
+
+      // Ignore reactions from bots (including ourselves)
+      if (user.bot) {
+        this.logger.debug("Ignoring reaction removal from bot", {
+          userId: user.id,
+          isMe: user.id === client.user?.id,
+        });
+        return;
+      }
+
+      this.logger.info("Discord Gateway reaction removed", {
+        emoji: reaction.emoji.name,
+        messageId: reaction.message.id,
+        channelId: reaction.message.channelId,
+        userId: user.id,
+      });
+
+      // Process the reaction (skip partial users without username)
+      if (user.username) {
+        await this.handleGatewayReaction(
+          reaction,
+          user as { id: string; username: string; bot: boolean },
+          false,
+        );
+      }
+    });
+  }
+
+  /**
+   * Forward a Gateway event to the webhook endpoint.
+   */
+  private async forwardGatewayEvent(
+    webhookUrl: string,
+    event: DiscordForwardedEvent,
+  ): Promise<void> {
+    try {
+      this.logger.debug("Forwarding Gateway event to webhook", {
+        type: event.type,
+        webhookUrl,
+      });
+
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-discord-gateway-token": this.botToken,
+        },
+        body: JSON.stringify(event),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error("Failed to forward Gateway event", {
+          type: event.type,
+          status: response.status,
+          error: errorText,
+        });
+      } else {
+        this.logger.debug("Gateway event forwarded successfully", {
+          type: event.type,
+        });
+      }
+    } catch (error) {
+      this.logger.error("Error forwarding Gateway event", {
+        type: event.type,
+        error: String(error),
+      });
     }
   }
 
@@ -1331,7 +1556,10 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
    * Handle a reaction received via the Gateway WebSocket.
    */
   private async handleGatewayReaction(
-    reaction: { emoji: { name: string | null; id: string | null }; message: { id: string; channelId: string; guildId: string | null } },
+    reaction: {
+      emoji: { name: string | null; id: string | null };
+      message: { id: string; channelId: string; guildId: string | null };
+    },
     user: { id: string; username: string; bot: boolean },
     added: boolean,
   ): Promise<void> {
