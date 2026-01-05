@@ -4,21 +4,36 @@
  * These tests replay real Discord interactions captured from production
  * to verify the adapter handles actual Discord payloads correctly.
  *
- * Based on recordings from SHA 94eb6504 which captured:
- * - Button clicks: hello, info, messages, goodbye
- * - DM interactions
- * - Multi-user scenarios
+ * Based on recordings from SHA 893def7 which captured:
+ * - Gateway forwarded events (MESSAGE_CREATE, REACTION_ADD, etc.)
+ * - Button clicks (hello, messages)
  * - Thread-based conversations
+ * - AI mode interactions
+ * - DM requests
  */
 
-import type { ActionEvent } from "chat";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ActionEvent, Message, ReactionEvent, Thread } from "chat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import discordFixtures from "../fixtures/replay/discord.json";
+import {
+  createGatewayMessageEvent,
+  createGatewayReactionEvent,
+  DISCORD_APPLICATION_ID,
+} from "./discord-utils";
 import {
   createDiscordTestContext,
   type DiscordTestContext,
   expectValidAction,
 } from "./replay-test-utils";
+
+// Runtime check that throws if null and returns the value
+// Requires explicit type parameter: defined<Message>(capturedMessage)
+function defined<T>(value: unknown): T {
+  if (value === null || value === undefined) {
+    throw new Error("Expected value to be defined");
+  }
+  return value as T;
+}
 
 const REAL_BOT_ID = discordFixtures.metadata.botId;
 const REAL_GUILD_ID = discordFixtures.metadata.guildId;
@@ -39,9 +54,9 @@ describe("Discord Replay Tests", () => {
     vi.clearAllMocks();
   });
 
-  describe("Production Button Actions (from SHA 94eb6504)", () => {
+  describe("Production Button Actions (from SHA 893def7)", () => {
     it("should handle 'hello' button click from production recording", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -73,7 +88,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should handle 'messages' button click that triggers fetch operation", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -109,7 +124,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should handle 'info' button click showing bot information", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -141,7 +156,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should handle 'goodbye' button click (danger style)", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -177,7 +192,7 @@ describe("Discord Replay Tests", () => {
 
   describe("DM Interactions", () => {
     it("should handle button click in DM channel", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -204,7 +219,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should extract user info from DM interaction (user field, not member.user)", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -226,7 +241,7 @@ describe("Discord Replay Tests", () => {
     it("should handle same action from different users", async () => {
       const actionLog: Array<{ userId: string; actionId: string }> = [];
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -254,7 +269,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should correctly populate different user properties", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -273,7 +288,7 @@ describe("Discord Replay Tests", () => {
 
   describe("Thread ID Verification", () => {
     it("should create correct thread ID for guild thread interactions", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -294,7 +309,7 @@ describe("Discord Replay Tests", () => {
     it("should maintain consistent thread ID across multiple actions", async () => {
       const threadIds: string[] = [];
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -315,7 +330,7 @@ describe("Discord Replay Tests", () => {
 
   describe("Message Operations", () => {
     it("should post, then edit message", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -336,7 +351,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should support typing indicator before posting", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -353,7 +368,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should add reactions to posted messages", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -370,7 +385,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should delete posted messages", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -394,7 +409,7 @@ describe("Discord Replay Tests", () => {
       const messagesHandler = vi.fn();
       const goodbyeHandler = vi.fn();
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {},
       );
@@ -418,7 +433,7 @@ describe("Discord Replay Tests", () => {
     it("should support catch-all handler for any action", async () => {
       const catchAllHandler = vi.fn();
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {},
       );
@@ -441,7 +456,7 @@ describe("Discord Replay Tests", () => {
     it("should support array of action IDs in handler", async () => {
       const multiHandler = vi.fn();
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {},
       );
@@ -466,7 +481,7 @@ describe("Discord Replay Tests", () => {
 
   describe("Response Types", () => {
     it("should return DEFERRED_UPDATE_MESSAGE (type 6) for button interactions", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async () => {},
@@ -485,7 +500,7 @@ describe("Discord Replay Tests", () => {
     it("should handle full conversation: hello → info → messages → goodbye", async () => {
       const actionLog: string[] = [];
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -542,7 +557,7 @@ describe("Discord Replay Tests", () => {
 
   describe("Edit Message Pattern (Streaming Fallback)", () => {
     it("should handle post then edit pattern", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -574,7 +589,7 @@ describe("Discord Replay Tests", () => {
     it("should handle multiple post-edit cycles", async () => {
       const editCount = { value: 0 };
 
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -607,7 +622,7 @@ describe("Discord Replay Tests", () => {
     });
 
     it("should support progressive edits to same message", async () => {
-      ctx = createDiscordTestContext(
+      ctx = await createDiscordTestContext(
         { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
         {
           onAction: async (event) => {
@@ -629,6 +644,526 @@ describe("Discord Replay Tests", () => {
       // Final edit should have complete content
       const updateCalls = ctx.mockApi.messages.update.mock.calls;
       expect(updateCalls[1][0].content).toBe("Step 1... Step 2... Done!");
+    });
+  });
+});
+
+describe("Discord Gateway Forwarded Events", () => {
+  let ctx: DiscordTestContext;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    if (ctx) {
+      await ctx.chat.shutdown();
+      ctx.cleanup();
+    }
+  });
+
+  describe("isMe Detection for Forwarded Messages", () => {
+    it("should set isMe=true when message author is the bot", async () => {
+      let capturedMessage: Message | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onMention: async (_thread, message) => {
+            capturedMessage = message;
+          },
+        },
+      );
+
+      // Send a message FROM the bot (author.id === applicationId)
+      const gatewayEvent = createGatewayMessageEvent({
+        content: "Hello from the bot",
+        authorId: DISCORD_APPLICATION_ID,
+        authorUsername: "TestBot",
+        authorBot: true,
+        mentions: [{ id: DISCORD_APPLICATION_ID, username: "TestBot" }],
+      });
+
+      await ctx.sendGatewayEvent(gatewayEvent);
+
+      // Bot messages should NOT trigger handlers (isMe=true causes skip)
+      expect(capturedMessage).toBeNull();
+    });
+
+    it("should set isMe=false when message author is a regular user", async () => {
+      let capturedMessage: Message | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onMention: async (_thread, message) => {
+            capturedMessage = message;
+          },
+        },
+      );
+
+      // Send a message FROM a regular user that mentions the bot
+      const gatewayEvent = createGatewayMessageEvent({
+        content: `<@${DISCORD_APPLICATION_ID}> Hello`,
+        authorId: "USER123",
+        authorUsername: "regularuser",
+        authorBot: false,
+        mentions: [{ id: DISCORD_APPLICATION_ID, username: "TestBot" }],
+      });
+
+      await ctx.sendGatewayEvent(gatewayEvent);
+
+      // User messages should trigger handlers
+      const msg = defined<Message>(capturedMessage);
+      expect(msg.author.isMe).toBe(false);
+      expect(msg.author.isBot).toBe(false);
+      expect(msg.author.userId).toBe("USER123");
+    });
+
+    it("should skip bot's own messages in subscribed threads", async () => {
+      let subscribedMessageCount = 0;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onMention: async (thread) => {
+            // Subscribe to the thread when mentioned
+            await thread.subscribe();
+          },
+          onSubscribed: async () => {
+            subscribedMessageCount++;
+          },
+        },
+      );
+
+      // First, trigger a mention to subscribe
+      const mentionEvent = createGatewayMessageEvent({
+        content: `<@${DISCORD_APPLICATION_ID}> subscribe me`,
+        authorId: "USER123",
+        authorUsername: "regularuser",
+        mentions: [{ id: DISCORD_APPLICATION_ID, username: "TestBot" }],
+      });
+      await ctx.sendGatewayEvent(mentionEvent);
+
+      // Send a message from the bot itself
+      const botMessage = createGatewayMessageEvent({
+        content: "Bot response",
+        authorId: DISCORD_APPLICATION_ID,
+        authorUsername: "TestBot",
+        authorBot: true,
+      });
+
+      await ctx.sendGatewayEvent(botMessage);
+
+      // Bot's own message should NOT trigger subscribed handler
+      expect(subscribedMessageCount).toBe(0);
+
+      // Send a message from a regular user
+      const userMessage = createGatewayMessageEvent({
+        content: "User message",
+        authorId: "USER123",
+        authorUsername: "regularuser",
+        authorBot: false,
+      });
+
+      await ctx.sendGatewayEvent(userMessage);
+
+      // User message SHOULD trigger subscribed handler
+      expect(subscribedMessageCount).toBe(1);
+    });
+
+    it("should not enable AI mode from bot's own welcome message", async () => {
+      let aiModeEnabled = false;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onMention: async (thread) => {
+            await thread.subscribe();
+          },
+          onSubscribed: async (_thread, message) => {
+            // This simulates the regex check in bot.tsx
+            if (/enable\s*AI/i.test(message.text)) {
+              aiModeEnabled = true;
+            }
+          },
+        },
+      );
+
+      // First, trigger a mention to subscribe
+      const mentionEvent = createGatewayMessageEvent({
+        content: `<@${DISCORD_APPLICATION_ID}> hello`,
+        authorId: "USER123",
+        authorUsername: "regularuser",
+        mentions: [{ id: DISCORD_APPLICATION_ID, username: "TestBot" }],
+      });
+      await ctx.sendGatewayEvent(mentionEvent);
+
+      // Simulate bot posting its own welcome message that contains "enable AI"
+      const botWelcomeMessage = createGatewayMessageEvent({
+        content: 'Mention me with "AI" to enable AI assistant mode',
+        authorId: DISCORD_APPLICATION_ID,
+        authorUsername: "TestBot",
+        authorBot: true,
+      });
+
+      await ctx.sendGatewayEvent(botWelcomeMessage);
+
+      // AI mode should NOT be enabled from bot's own message
+      expect(aiModeEnabled).toBe(false);
+    });
+  });
+
+  describe("isMe Detection for Forwarded Reactions", () => {
+    it("should set isMe=true when reaction is from the bot", async () => {
+      let capturedReaction: ReactionEvent | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onReaction: async (event) => {
+            capturedReaction = event;
+          },
+        },
+      );
+
+      // Send a reaction FROM the bot
+      const gatewayEvent = createGatewayReactionEvent({
+        added: true,
+        emojiName: "👍",
+        userId: DISCORD_APPLICATION_ID,
+        userUsername: "TestBot",
+        userBot: true,
+      });
+
+      await ctx.sendGatewayEvent(gatewayEvent);
+
+      // Bot reactions should NOT trigger handlers (isMe=true causes skip)
+      expect(capturedReaction).toBeNull();
+    });
+
+    it("should set isMe=false when reaction is from a regular user", async () => {
+      let capturedReaction: ReactionEvent | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onReaction: async (event) => {
+            capturedReaction = event;
+          },
+        },
+      );
+
+      // Send a reaction FROM a regular user
+      const gatewayEvent = createGatewayReactionEvent({
+        added: true,
+        emojiName: "👍",
+        userId: "USER123",
+        userUsername: "regularuser",
+        userBot: false,
+      });
+
+      await ctx.sendGatewayEvent(gatewayEvent);
+
+      // User reactions should trigger handlers
+      const reaction = defined<ReactionEvent>(capturedReaction);
+      expect(reaction.user.isMe).toBe(false);
+      expect(reaction.user.isBot).toBe(false);
+      expect(reaction.user.userId).toBe("USER123");
+    });
+  });
+
+  describe("Gateway Message Processing", () => {
+    it("should correctly identify mentioned messages", async () => {
+      let capturedMessage: Message | null = null;
+      let capturedThread: Thread | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onMention: async (thread, message) => {
+            capturedMessage = message;
+            capturedThread = thread;
+          },
+        },
+      );
+
+      const gatewayEvent = createGatewayMessageEvent({
+        content: `<@${DISCORD_APPLICATION_ID}> Help me`,
+        authorId: "USER123",
+        authorUsername: "testuser",
+        authorGlobalName: "Test User",
+        mentions: [{ id: DISCORD_APPLICATION_ID, username: "TestBot" }],
+      });
+
+      await ctx.sendGatewayEvent(gatewayEvent);
+
+      const msg = defined<Message>(capturedMessage);
+      const thread = defined<Thread>(capturedThread);
+      expect(msg.isMention).toBe(true);
+      expect(msg.text).toContain("Help me");
+      expect(thread.adapter.name).toBe("discord");
+    });
+
+    it("should process messages from subscribed threads", async () => {
+      const capturedMessages: Message[] = [];
+
+      ctx = await createDiscordTestContext(
+        { botName: "TestBot", applicationId: DISCORD_APPLICATION_ID },
+        {
+          onMention: async (thread) => {
+            await thread.subscribe();
+          },
+          onSubscribed: async (_thread, message) => {
+            capturedMessages.push(message);
+          },
+        },
+      );
+
+      // First, trigger a mention to subscribe
+      const mentionEvent = createGatewayMessageEvent({
+        content: `<@${DISCORD_APPLICATION_ID}> subscribe me`,
+        authorId: "USER123",
+        authorUsername: "testuser",
+        mentions: [{ id: DISCORD_APPLICATION_ID, username: "TestBot" }],
+      });
+      await ctx.sendGatewayEvent(mentionEvent);
+
+      // Send multiple user messages
+      for (let i = 1; i <= 3; i++) {
+        const event = createGatewayMessageEvent({
+          id: `msg_${i}`,
+          content: `Message ${i}`,
+          authorId: "USER123",
+          authorUsername: "testuser",
+        });
+        await ctx.sendGatewayEvent(event);
+      }
+
+      expect(capturedMessages).toHaveLength(3);
+      expect(capturedMessages.map((m) => m.text)).toEqual([
+        "Message 1",
+        "Message 2",
+        "Message 3",
+      ]);
+    });
+  });
+
+  describe("Real Gateway Fixtures (from SHA 893def7)", () => {
+    it("should handle real gatewayMention fixture", async () => {
+      let capturedMessage: Message | null = null;
+      let capturedThread: Thread | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onMention: async (thread, message) => {
+            capturedMessage = message;
+            capturedThread = thread;
+          },
+        },
+      );
+
+      await ctx.sendGatewayEvent(discordFixtures.gatewayMention);
+
+      const msg = defined<Message>(capturedMessage);
+      const thread = defined<Thread>(capturedThread);
+      expect(msg.isMention).toBe(true);
+      expect(msg.text).toBe("<@1457469483726668048> Hey");
+      expect(msg.author.userId).toBe(REAL_USER_ID);
+      expect(msg.author.userName).toBe(REAL_USER_NAME);
+      expect(msg.author.isMe).toBe(false);
+      expect(msg.author.isBot).toBe(false);
+      expect(thread.adapter.name).toBe("discord");
+    });
+
+    it("should handle real gatewayAIMention fixture with AI keyword", async () => {
+      let capturedMessage: Message | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onMention: async (_thread, message) => {
+            capturedMessage = message;
+          },
+        },
+      );
+
+      await ctx.sendGatewayEvent(discordFixtures.gatewayAIMention);
+
+      const msg = defined<Message>(capturedMessage);
+      expect(msg.text).toBe("<@1457469483726668048> AI What is love");
+      expect(msg.isMention).toBe(true);
+      // Verify the message contains "AI" for AI mode trigger
+      expect(msg.text).toMatch(/\bAI\b/i);
+    });
+
+    it("should skip real gatewayBotWelcome fixture (bot's own message)", async () => {
+      let capturedMessage: Message | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onMention: async (_thread, message) => {
+            capturedMessage = message;
+          },
+        },
+      );
+
+      // The bot's welcome message should be skipped because isMe=true
+      await ctx.sendGatewayEvent(discordFixtures.gatewayBotWelcome);
+
+      // Bot's own message should NOT trigger any handlers
+      expect(capturedMessage).toBeNull();
+    });
+
+    it("should skip real gatewayThreadWelcome fixture (bot's own thread message)", async () => {
+      let subscribedCount = 0;
+      let mentionCount = 0;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onMention: async () => {
+            mentionCount++;
+          },
+          onSubscribed: async () => {
+            subscribedCount++;
+          },
+        },
+      );
+
+      // Bot's welcome message in thread should be skipped due to isMe=true
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadWelcome);
+
+      expect(mentionCount).toBe(0);
+      expect(subscribedCount).toBe(0);
+    });
+
+    it("should handle real gatewayReactionAdd fixture", async () => {
+      let capturedReaction: ReactionEvent | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onReaction: async (event) => {
+            capturedReaction = event;
+          },
+        },
+      );
+
+      await ctx.sendGatewayEvent(discordFixtures.gatewayReactionAdd);
+
+      const reaction = defined<ReactionEvent>(capturedReaction);
+      expect(reaction.added).toBe(true);
+      expect(reaction.user.userId).toBe(REAL_USER_ID);
+      expect(reaction.user.isMe).toBe(false);
+      expect(reaction.rawEmoji).toBe("👍");
+    });
+
+    it("should handle real thread messages when subscribed via thread ID", async () => {
+      const capturedMessages: Message[] = [];
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onSubscribed: async (_thread, message) => {
+            capturedMessages.push(message);
+          },
+        },
+      );
+
+      // Mock the channels.get API to return parent_id for the thread
+      ctx.mockApi.channels.get.mockResolvedValue({
+        id: "1457536551830421524",
+        type: 11,
+        parent_id: "1457510428359004343",
+      });
+
+      // Manually subscribe to the thread (simulating bot subscribing after creating thread)
+      const threadId = `discord:${REAL_GUILD_ID}:1457510428359004343:1457536551830421524`;
+      await ctx.state.subscribe(threadId);
+
+      // Now send real thread messages
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadUserHey);
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadNice);
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadNum1);
+
+      expect(capturedMessages).toHaveLength(3);
+      expect(capturedMessages[0].text).toBe("Hey");
+      expect(capturedMessages[0].author.isMe).toBe(false);
+      expect(capturedMessages[1].text).toBe("Nice");
+      expect(capturedMessages[2].text).toBe("1");
+    });
+
+    it("should handle real DM request in subscribed thread", async () => {
+      let dmMessage: Message | null = null;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onSubscribed: async (_thread, message) => {
+            dmMessage = message;
+          },
+        },
+      );
+
+      // Mock the channels.get API to return parent_id for the thread
+      ctx.mockApi.channels.get.mockResolvedValue({
+        id: "1457536551830421524",
+        type: 11,
+        parent_id: "1457510428359004343",
+      });
+
+      // Subscribe to the thread
+      const threadId = `discord:${REAL_GUILD_ID}:1457510428359004343:1457536551830421524`;
+      await ctx.state.subscribe(threadId);
+
+      // Send the DM request message
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadDMRequest);
+
+      const dm = defined<Message>(dmMessage);
+      expect(dm.text).toBe("DM me");
+      expect(dm.author.userId).toBe(REAL_USER_ID);
+      expect(dm.author.isMe).toBe(false);
+    });
+
+    it("should verify isMe fix prevents bot's own messages from triggering handlers", async () => {
+      let handlerCallCount = 0;
+
+      ctx = await createDiscordTestContext(
+        { botName: "Chat SDK Demo", applicationId: REAL_BOT_ID },
+        {
+          onMention: async () => {
+            handlerCallCount++;
+          },
+          onSubscribed: async () => {
+            handlerCallCount++;
+          },
+        },
+      );
+
+      // Mock the channels.get API
+      ctx.mockApi.channels.get.mockResolvedValue({
+        id: "1457536551830421524",
+        type: 11,
+        parent_id: "1457510428359004343",
+      });
+
+      // Subscribe to thread
+      const threadId = `discord:${REAL_GUILD_ID}:1457510428359004343:1457536551830421524`;
+      await ctx.state.subscribe(threadId);
+
+      // Send bot's own messages - these should all be skipped
+      await ctx.sendGatewayEvent(discordFixtures.gatewayBotWelcome);
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadWelcome);
+
+      // None of the bot's messages should trigger handlers
+      expect(handlerCallCount).toBe(0);
+
+      // Now send a real user message - this SHOULD trigger the handler
+      await ctx.sendGatewayEvent(discordFixtures.gatewayThreadUserHey);
+      expect(handlerCallCount).toBe(1);
     });
   });
 });

@@ -410,3 +410,95 @@ export function getDiscordThreadId(
   const threadPart = threadId ? `:${threadId}` : "";
   return `discord:${guildId}:${channelId}${threadPart}`;
 }
+
+/**
+ * Create a Gateway forwarded event webhook request.
+ * These use bot token authentication instead of Ed25519 signatures.
+ */
+export function createDiscordGatewayRequest(
+  payload: Record<string, unknown>,
+  botToken = DISCORD_BOT_TOKEN,
+): Request {
+  return new Request("https://example.com/webhook/discord", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-discord-gateway-token": botToken,
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Create a GATEWAY_MESSAGE_CREATE event payload
+ */
+export function createGatewayMessageEvent(options: {
+  id?: string;
+  channelId?: string;
+  guildId?: string;
+  content: string;
+  authorId: string;
+  authorUsername: string;
+  authorGlobalName?: string;
+  authorBot?: boolean;
+  channelType?: number;
+  mentions?: Array<{ id: string; username: string }>;
+}): Record<string, unknown> {
+  return {
+    type: "GATEWAY_MESSAGE_CREATE",
+    timestamp: Date.now(),
+    data: {
+      id: options.id || `msg_${Date.now()}`,
+      channel_id: options.channelId || "CHANNEL456",
+      channel_type: options.channelType,
+      guild_id: options.guildId ?? "GUILD123",
+      content: options.content,
+      author: {
+        id: options.authorId,
+        username: options.authorUsername,
+        global_name: options.authorGlobalName || options.authorUsername,
+        bot: options.authorBot ?? false,
+      },
+      timestamp: new Date().toISOString(),
+      mentions: options.mentions || [],
+      attachments: [],
+    },
+  };
+}
+
+/**
+ * Create a GATEWAY_REACTION_ADD or GATEWAY_REACTION_REMOVE event payload
+ */
+export function createGatewayReactionEvent(options: {
+  added: boolean;
+  emojiName: string;
+  emojiId?: string;
+  messageId?: string;
+  channelId?: string;
+  guildId?: string;
+  userId: string;
+  userUsername: string;
+  userBot?: boolean;
+}): Record<string, unknown> {
+  return {
+    type: options.added
+      ? "GATEWAY_MESSAGE_REACTION_ADD"
+      : "GATEWAY_MESSAGE_REACTION_REMOVE",
+    timestamp: Date.now(),
+    data: {
+      emoji: {
+        name: options.emojiName,
+        id: options.emojiId || null,
+      },
+      message_id: options.messageId || "msg_123",
+      channel_id: options.channelId || "CHANNEL456",
+      guild_id: options.guildId ?? "GUILD123",
+      user_id: options.userId,
+      user: {
+        id: options.userId,
+        username: options.userUsername,
+        bot: options.userBot ?? false,
+      },
+    },
+  };
+}

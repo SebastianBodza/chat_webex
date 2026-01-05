@@ -24,10 +24,10 @@ import {
 describe("fetchMessages Replay Tests - Discord", () => {
   let ctx: DiscordTestContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
-    ctx = createDiscordTestContext(
+    ctx = await createDiscordTestContext(
       { botName: "Chat SDK Demo", applicationId: DISCORD_BOT_USER_ID },
       {},
     );
@@ -219,10 +219,10 @@ describe("fetchMessages Replay Tests - Discord", () => {
 describe("allMessages Replay Tests - Discord", () => {
   let ctx: DiscordTestContext;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
 
-    ctx = createDiscordTestContext(
+    ctx = await createDiscordTestContext(
       { botName: "Chat SDK Demo", applicationId: DISCORD_BOT_USER_ID },
       {},
     );

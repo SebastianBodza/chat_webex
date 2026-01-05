@@ -360,14 +360,14 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
           options,
         );
         break;
-      case "GATEWAY_REACTION_ADD":
+      case "GATEWAY_MESSAGE_REACTION_ADD":
         await this.handleForwardedReaction(
           event.data as DiscordGatewayReactionData,
           true,
           options,
         );
         break;
-      case "GATEWAY_REACTION_REMOVE":
+      case "GATEWAY_MESSAGE_REACTION_REMOVE":
         await this.handleForwardedReaction(
           event.data as DiscordGatewayReactionData,
           false,
@@ -469,7 +469,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         userId: data.author.id,
         userName: data.author.username,
         fullName: data.author.global_name || data.author.username,
-        isBot: data.author.bot,
+        isBot: data.author.bot === true, // Discord returns null for non-bots
         isMe: data.author.id === this.applicationId,
       },
       metadata: {
@@ -519,6 +519,13 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     const emojiName = data.emoji.name || "unknown";
     const normalizedEmoji = this.normalizeDiscordEmoji(emojiName);
 
+    // Get user info from either data.user (DMs) or data.member.user (guilds)
+    const userInfo = data.user ?? data.member?.user;
+    if (!userInfo) {
+      this.logger.warn("Reaction event missing user info", { data });
+      return;
+    }
+
     const reactionEvent = {
       adapter: this as Adapter,
       threadId,
@@ -527,11 +534,11 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       rawEmoji: data.emoji.id ? `<:${emojiName}:${data.emoji.id}>` : emojiName,
       added,
       user: {
-        userId: data.user.id,
-        userName: data.user.username,
-        fullName: data.user.username,
-        isBot: data.user.bot,
-        isMe: data.user.id === this.applicationId,
+        userId: userInfo.id,
+        userName: userInfo.username,
+        fullName: userInfo.username,
+        isBot: userInfo.bot === true, // Discord returns null for non-bots
+        isMe: userInfo.id === this.applicationId,
       },
       raw: data,
     };
@@ -1618,8 +1625,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         userId: user.id,
         userName: user.username,
         fullName: user.username,
-        isBot: user.bot,
-        isMe: false,
+        isBot: user.bot === true, // Match pattern from handleForwardedReaction
+        isMe: user.id === this.applicationId,
       },
       raw: {
         emoji: reaction.emoji,

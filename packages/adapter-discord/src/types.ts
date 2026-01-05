@@ -181,8 +181,8 @@ export interface DiscordInteractionResponse {
  */
 export type DiscordGatewayEventType =
   | "GATEWAY_MESSAGE_CREATE"
-  | "GATEWAY_REACTION_ADD"
-  | "GATEWAY_REACTION_REMOVE"
+  | "GATEWAY_MESSAGE_REACTION_ADD"
+  | "GATEWAY_MESSAGE_REACTION_REMOVE"
   | `GATEWAY_${string}`; // Allow any Gateway event type
 
 /**
@@ -257,10 +257,19 @@ export interface DiscordGatewayReactionData {
   guild_id: string | null;
   /** User who added/removed the reaction */
   user_id: string;
-  /** User details */
-  user: {
+  /** User details (for DMs) */
+  user?: {
     id: string;
     username: string;
-    bot: boolean;
+    bot?: boolean;
+  };
+  /** Member details (for guild reactions) */
+  member?: {
+    user: {
+      id: string;
+      username: string;
+      global_name?: string;
+      bot?: boolean;
+    };
   };
 }

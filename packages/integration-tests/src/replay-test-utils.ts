@@ -23,6 +23,7 @@ import {
   type Logger,
   type Message,
   type ReactionEvent,
+  type StateAdapter,
   type Thread,
 } from "chat";
 import type { Mock } from "vitest";
@@ -679,14 +680,16 @@ export interface DiscordTestContext {
   mockApi: MockDiscordApi;
   tracker: ReturnType<typeof createWaitUntilTracker>;
   captured: CapturedMessages;
+  state: StateAdapter;
   sendWebhook: (fixture: unknown) => Promise<Response>;
+  sendGatewayEvent: (fixture: unknown) => Promise<Response>;
   cleanup: () => void;
 }
 
 /**
  * Create a Discord test context with standard setup.
  */
-export function createDiscordTestContext(
+export async function createDiscordTestContext(
   fixtures: { botName?: string; applicationId?: string },
   handlers: {
     onMention?: (thread: Thread, message: Message) => Promise<void>;
@@ -694,7 +697,7 @@ export function createDiscordTestContext(
     onAction?: (event: ActionEvent) => Promise<void>;
     onReaction?: (event: ReactionEvent) => Promise<void>;
   },
-): DiscordTestContext {
+): Promise<DiscordTestContext> {
   const applicationId = fixtures.applicationId || DISCORD_APPLICATION_ID;
   const botName = fixtures.botName || DISCORD_BOT_USERNAME;
 
@@ -709,10 +712,13 @@ export function createDiscordTestContext(
   const mockApi = createMockDiscordApi();
   setupDiscordFetchMock(mockApi);
 
+  const stateAdapter = createMemoryState();
+  // Connect state adapter so it's ready for direct access via ctx.state
+  await stateAdapter.connect();
   const chat = new Chat({
     userName: botName,
     adapters: { discord: adapter },
-    state: createMemoryState(),
+    state: stateAdapter,
     logger: "error",
   });
 
@@ -757,10 +763,20 @@ export function createDiscordTestContext(
     mockApi,
     tracker,
     captured,
+    state: stateAdapter,
     sendWebhook: async (fixture: unknown) => {
       const { createDiscordWebhookRequest } = await import("./discord-utils");
       const response = await chat.webhooks.discord(
         createDiscordWebhookRequest(fixture as Record<string, unknown>),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+      return response;
+    },
+    sendGatewayEvent: async (fixture: unknown) => {
+      const { createDiscordGatewayRequest } = await import("./discord-utils");
+      const response = await chat.webhooks.discord(
+        createDiscordGatewayRequest(fixture as Record<string, unknown>),
         { waitUntil: tracker.waitUntil },
       );
       await tracker.waitForAll();
