@@ -101,6 +101,15 @@ export function after(fn: () => unknown): void;
   `,
   );
 
+  // Ephemeral declarations to inject into code blocks that need them
+  const ephemeralDeclarations = `
+declare const bot: import("chat").Chat;
+declare const thread: import("chat").Thread;
+declare const agent: {
+  stream(opts: { prompt: unknown }): Promise<{ textStream: AsyncIterable<string> }>;
+};
+`;
+
   // Write each code block as a separate file
   codeBlocks.forEach((code, index) => {
     let filename: string;
@@ -113,6 +122,15 @@ export function after(fn: () => unknown): void;
       processedCode = code.replace("@/lib/bot", "./bot");
     } else {
       filename = `block-${index}.ts`;
+      // Inject ephemeral declarations for blocks that import from "chat"
+      // but don't define their own bot/thread (they use `declare const`)
+      if (
+        code.includes('from "chat"') &&
+        !code.includes("export const bot") &&
+        !code.includes("const bot = new Chat")
+      ) {
+        processedCode = ephemeralDeclarations + code;
+      }
     }
 
     writeFileSync(join(tempDir, filename), processedCode);

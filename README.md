@@ -248,7 +248,6 @@ Handle button clicks from cards:
 
 ```typescript
 import { Chat, type ActionEvent } from "chat";
-declare const bot: Chat;
 
 // Handle a specific action
 bot.onAction("approve", async (event: ActionEvent) => {
@@ -274,35 +273,12 @@ The `ActionEvent` includes `actionId`, `value`, `user`, `thread`, `messageId`, `
 Stream LLM responses directly to chat platforms. The SDK accepts any `AsyncIterable<string>` (like AI SDK's `textStream`), automatically using native streaming APIs where available (Slack) or falling back to post+edit for other platforms.
 
 ```typescript
-import { Chat, emoji } from "chat";
+import { Chat } from "chat";
 
-declare const bot: Chat;
-
-// Any AI SDK that returns AsyncIterable<string> works
-declare const agent: {
-  stream(opts: { prompt: unknown }): Promise<{ textStream: AsyncIterable<string> }>;
-};
-
-// Stream AI response directly to chat
-bot.onSubscribedMessage(async (thread, message) => {
-  const threadState = await thread.state;
-
-  if (threadState?.aiMode) {
-    // Fetch conversation history for context
-    const { messages } = await thread.adapter.fetchMessages(thread.id, {
-      limit: 20,
-    });
-
-    // Convert to AI SDK format
-    const history = messages.reverse().map((msg) => ({
-      role: msg.author.isMe ? ("assistant" as const) : ("user" as const),
-      content: msg.text,
-    }));
-
-    // Stream response - SDK handles platform differences
-    const result = await agent.stream({ prompt: history });
-    await thread.post(result.textStream);
-  }
+// Stream AI response on @mention
+bot.onNewMention(async (thread, message) => {
+  const result = await agent.stream({ prompt: message.text });
+  await thread.post(result.textStream);
 });
 ```
 
@@ -325,7 +301,6 @@ Send files along with messages:
 
 ```typescript
 import type { Thread } from "chat";
-declare const thread: Thread;
 
 // Send a file with a message
 const reportBuffer = Buffer.from("PDF content");
@@ -365,7 +340,6 @@ Access attachments from incoming messages:
 
 ```typescript
 import { Chat } from "chat";
-declare const bot: Chat;
 
 bot.onSubscribedMessage(async (thread, message) => {
   for (const attachment of message.attachments ?? []) {
@@ -389,7 +363,6 @@ Initiate DM conversations programmatically. The adapter is automatically inferre
 
 ```typescript
 import { Chat } from "chat";
-declare const bot: Chat;
 
 // Open a DM using Author object (convenient in handlers)
 bot.onSubscribedMessage(async (thread, message) => {
