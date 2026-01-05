@@ -1,1 +1,1 @@
-- Adapter independent channel names
+- Testing attachments

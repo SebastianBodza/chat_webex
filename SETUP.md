@@ -61,39 +61,33 @@ If deploying from the monorepo root:
 ## Testing Your Setup
 
 ### Slack
-
 ```
 @YourBot hello
 ```
 
 ### Teams
-
 Chat directly with the bot or @mention in a channel.
 
 ### Google Chat
-
 ```
 @YourBot hello
 ```
 
 ### Discord
-
 ```
 @YourBot hello
 ```
 
-The bot will respond and create a thread for the conversation.
+The bot will respond and may create a thread for the conversation.
 
 ## Troubleshooting
 
 ### Redis connection errors
-
 - Verify `REDIS_URL` is correct
 - For Vercel, use Upstash Redis or similar serverless-compatible Redis
 - Check firewall/network rules allow connections
 
 ### Duplicate messages
-
 The SDK includes deduplication, but ensure Redis is properly configured for production deployments.
 
 For platform-specific troubleshooting, see the individual adapter READMEs linked above.

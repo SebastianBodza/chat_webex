@@ -708,7 +708,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         platform: "discord" as "slack",
       });
       if (!buffer) continue;
-      const blob = new Blob([buffer], {
+      const blob = new Blob([new Uint8Array(buffer)], {
         type: file.mimeType || "application/octet-stream",
       });
       formData.append(`files[${i}]`, blob, file.filename);

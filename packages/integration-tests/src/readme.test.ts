@@ -1,17 +1,27 @@
 /**
- * Tests that code examples in README.md are valid TypeScript.
+ * Tests that code examples in README.md files are valid TypeScript.
  *
  * This ensures documentation stays in sync with the actual API.
+ *
+ * - Main README: Full type-checking (examples should be complete)
+ * - Package READMEs: Syntax-only checking (examples are intentionally minimal)
  */
 
 import { execSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const README_PATH = join(__dirname, "../../../README.md");
 const REPO_ROOT = join(__dirname, "../../..");
+const PACKAGES_DIR = join(REPO_ROOT, "packages");
 
 /**
  * Extract TypeScript code blocks from markdown content.
@@ -59,8 +69,14 @@ function createTempProject(codeBlocks: string[]): string {
         "@chat-adapter/gchat": [
           join(__dirname, "../../adapter-gchat/src/index.ts"),
         ],
+        "@chat-adapter/discord": [
+          join(__dirname, "../../adapter-discord/src/index.ts"),
+        ],
         "@chat-adapter/state-redis": [
           join(__dirname, "../../state-redis/src/index.ts"),
+        ],
+        "@chat-adapter/state-ioredis": [
+          join(__dirname, "../../state-ioredis/src/index.ts"),
         ],
         "@chat-adapter/state-memory": [
           join(__dirname, "../../state-memory/src/index.ts"),
@@ -86,40 +102,56 @@ export function after(fn: () => unknown): void;
   );
 
   // Write each code block as a separate file
-  // The bot.ts file needs to be written first so route.ts can import it
   codeBlocks.forEach((code, index) => {
-    // Determine filename based on content
     let filename: string;
+    let processedCode = code;
+
     if (code.includes("export const bot = new Chat")) {
       filename = "bot.ts";
     } else if (code.includes("export async function POST")) {
       filename = "route.ts";
-      // Fix the import path for the test environment
-      code = code.replace("@/lib/bot", "./bot");
+      processedCode = code.replace("@/lib/bot", "./bot");
     } else {
       filename = `block-${index}.ts`;
     }
 
-    writeFileSync(join(tempDir, filename), code);
+    writeFileSync(join(tempDir, filename), processedCode);
   });
 
   return tempDir;
 }
 
-describe("README.md code examples", () => {
-  it("should contain valid TypeScript that type-checks", () => {
-    // Read README
-    const readme = readFileSync(README_PATH, "utf-8");
+/**
+ * Find all README.md files in packages directory.
+ */
+function findPackageReadmes(): Array<{ path: string; name: string }> {
+  const readmes: Array<{ path: string; name: string }> = [];
 
-    // Extract code blocks
+  const packages = readdirSync(PACKAGES_DIR);
+  for (const pkg of packages) {
+    const readmePath = join(PACKAGES_DIR, pkg, "README.md");
+    if (existsSync(readmePath)) {
+      readmes.push({
+        path: readmePath,
+        name: `packages/${pkg}/README.md`,
+      });
+    }
+  }
+
+  return readmes;
+}
+
+describe("Main README.md code examples", () => {
+  const mainReadmePath = join(REPO_ROOT, "README.md");
+
+  it("should contain valid TypeScript that type-checks", () => {
+    const readme = readFileSync(mainReadmePath, "utf-8");
     const codeBlocks = extractTypeScriptBlocks(readme);
     expect(codeBlocks.length).toBeGreaterThan(0);
 
-    // Create temp project
     const tempDir = createTempProject(codeBlocks);
 
     try {
-      // Run tsc using the repo's typescript installation
       execSync(`pnpm exec tsc --project ${tempDir}/tsconfig.json --noEmit`, {
         cwd: REPO_ROOT,
         encoding: "utf-8",
@@ -128,23 +160,19 @@ describe("README.md code examples", () => {
     } catch (error) {
       const execError = error as { stdout?: string; stderr?: string };
       const output = execError.stdout || execError.stderr || String(error);
-
-      // Clean up before failing
       rmSync(tempDir, { recursive: true, force: true });
 
-      // Fail with helpful error message
       expect.fail(
         `README.md TypeScript code blocks failed type-checking:\n\n${output}\n\n` +
           `Code blocks tested:\n${codeBlocks.map((b, i) => `--- Block ${i} ---\n${b}`).join("\n\n")}`,
       );
     }
 
-    // Clean up
     rmSync(tempDir, { recursive: true, force: true });
   });
 
   it("should have at least a bot definition and route handler", () => {
-    const readme = readFileSync(README_PATH, "utf-8");
+    const readme = readFileSync(mainReadmePath, "utf-8");
     const codeBlocks = extractTypeScriptBlocks(readme);
 
     const hasBotDefinition = codeBlocks.some(
@@ -162,4 +190,69 @@ describe("README.md code examples", () => {
       true,
     );
   });
+});
+
+describe("Package README code examples", () => {
+  const packageReadmes = findPackageReadmes();
+
+  for (const { path: readmePath, name: readmeName } of packageReadmes) {
+    const pkgName = basename(readmePath.replace("/README.md", ""));
+
+    it(`${pkgName} README should have TypeScript examples with valid syntax`, () => {
+      const readme = readFileSync(readmePath, "utf-8");
+      const codeBlocks = extractTypeScriptBlocks(readme);
+
+      // Skip READMEs without TypeScript blocks (e.g., integration-tests)
+      if (codeBlocks.length === 0) {
+        return;
+      }
+
+      // Verify each block has valid TypeScript syntax (not full type-checking)
+      // by checking for common syntax errors
+      for (const block of codeBlocks) {
+        // Check for obviously broken syntax
+        const openBraces = (block.match(/{/g) || []).length;
+        const closeBraces = (block.match(/}/g) || []).length;
+        const openParens = (block.match(/\(/g) || []).length;
+        const closeParens = (block.match(/\)/g) || []).length;
+
+        expect(
+          openBraces,
+          `${readmeName}: Mismatched braces in code block`,
+        ).toBe(closeBraces);
+        expect(
+          openParens,
+          `${readmeName}: Mismatched parentheses in code block`,
+        ).toBe(closeParens);
+
+        // Check that imports reference valid packages
+        const importMatches = block.match(/from ["']([^"']+)["']/g) || [];
+        for (const importMatch of importMatches) {
+          const pkg = importMatch.match(/from ["']([^"']+)["']/)?.[1];
+          if (pkg && !pkg.startsWith(".") && !pkg.startsWith("@/")) {
+            // Known valid packages
+            const validPackages = [
+              "chat",
+              "@chat-adapter/slack",
+              "@chat-adapter/teams",
+              "@chat-adapter/gchat",
+              "@chat-adapter/discord",
+              "@chat-adapter/state-redis",
+              "@chat-adapter/state-ioredis",
+              "@chat-adapter/state-memory",
+              "next/server",
+              "redis",
+              "ioredis",
+            ];
+            const isValid =
+              validPackages.includes(pkg) || pkg.startsWith("node:");
+            expect(
+              isValid,
+              `${readmeName}: Unknown import "${pkg}" in code block`,
+            ).toBe(true);
+          }
+        }
+      }
+    });
+  }
 });
