@@ -375,7 +375,8 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
         );
         break;
       default:
-        this.logger.warn("Unknown forwarded Gateway event type", {
+        // Other Gateway events are forwarded but not processed - this is expected
+        this.logger.debug("Forwarded Gateway event (no handler)", {
           type: event.type,
         });
     }
@@ -405,6 +406,29 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
     if (data.thread) {
       discordThreadId = data.thread.id;
       parentChannelId = data.thread.parent_id;
+    } else if (data.channel_type === 11 || data.channel_type === 12) {
+      // Message is in a thread (11 = public, 12 = private) but we don't have parent info
+      // Fetch the channel to get parent_id
+      try {
+        const response = await this.discordFetch(
+          `/channels/${channelId}`,
+          "GET",
+        );
+        const channel = (await response.json()) as { parent_id?: string };
+        if (channel.parent_id) {
+          discordThreadId = channelId;
+          parentChannelId = channel.parent_id;
+          this.logger.debug("Fetched thread parent for forwarded message", {
+            threadId: channelId,
+            parentId: channel.parent_id,
+          });
+        }
+      } catch (error) {
+        this.logger.error("Failed to fetch thread parent", {
+          error: String(error),
+          channelId,
+        });
+      }
     }
 
     // Check if bot is mentioned

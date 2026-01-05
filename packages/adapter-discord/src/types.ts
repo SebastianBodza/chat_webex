@@ -206,6 +206,8 @@ export interface DiscordGatewayMessageData {
   id: string;
   /** Channel where the message was sent */
   channel_id: string;
+  /** Channel type (11 = public thread, 12 = private thread) */
+  channel_type?: number;
   /** Guild ID, or null for DMs */
   guild_id: string | null;
   /** Message content */
