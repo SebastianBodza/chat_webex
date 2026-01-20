@@ -19,6 +19,7 @@ import {
 import {
   isJSX as _isJSX,
   toCardElement as _toCardElement,
+  toModalElement as _toModalElement,
   type ButtonProps,
   type CardJSXElement,
   type CardJSXProps,
@@ -42,6 +43,24 @@ export const isCardElement = _isCardElement;
 export const isJSX = _isJSX;
 export const Section = _Section;
 export const toCardElement = _toCardElement;
+export const toModalElement = _toModalElement;
+
+// Modal builders
+import {
+  fromReactModalElement as _fromReactModalElement,
+  isModalElement as _isModalElement,
+  Modal as _Modal,
+  Select as _Select,
+  SelectOption as _SelectOption,
+  TextInput as _TextInput,
+} from "./modals";
+export const fromReactModalElement = _fromReactModalElement;
+export const isModalElement = _isModalElement;
+export const Modal = _Modal;
+export const Select = _Select;
+export const SelectOption = _SelectOption;
+export const TextInput = _TextInput;
+
 // Card types
 export type {
   ActionsElement,
@@ -59,6 +78,17 @@ export type {
   TextElement,
   TextStyle,
 } from "./cards";
+// Modal types
+export type {
+  ModalChild,
+  ModalElement,
+  ModalOptions,
+  SelectElement,
+  SelectOptionElement,
+  SelectOptions,
+  TextInputElement,
+  TextInputOptions,
+} from "./modals";
 // JSX types
 export type {
   ButtonProps,
@@ -163,6 +193,15 @@ export type {
   Message,
   MessageHandler,
   MessageMetadata,
+  ModalCloseEvent,
+  ModalCloseHandler,
+  ModalCloseResponse,
+  ModalErrorsResponse,
+  ModalPushResponse,
+  ModalResponse,
+  ModalSubmitEvent,
+  ModalSubmitHandler,
+  ModalUpdateResponse,
   PostableAst,
   PostableCard,
   PostableMarkdown,

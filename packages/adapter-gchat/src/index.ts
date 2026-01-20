@@ -1005,7 +1005,7 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       threadName,
     });
 
-    const actionEvent: Omit<ActionEvent, "thread"> & {
+    const actionEvent: Omit<ActionEvent, "thread" | "openModal"> & {
       adapter: GoogleChatAdapter;
     } = {
       actionId,

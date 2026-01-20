@@ -34,3 +34,5 @@ recording*.json
 todo/
 # Turborepo
 .turbo
+.vercel
+.env*.local

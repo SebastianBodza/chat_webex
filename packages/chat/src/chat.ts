@@ -1,3 +1,5 @@
+import { isJSX, toModalElement } from "./jsx-runtime";
+import type { ModalElement } from "./modals";
 import { ThreadImpl } from "./thread";
 import type {
   ActionEvent,
@@ -12,6 +14,11 @@ import type {
   MentionHandler,
   Message,
   MessageHandler,
+  ModalCloseEvent,
+  ModalCloseHandler,
+  ModalResponse,
+  ModalSubmitEvent,
+  ModalSubmitHandler,
   ReactionEvent,
   ReactionHandler,
   StateAdapter,
@@ -43,6 +50,16 @@ interface ActionPattern {
   /** If specified, only these action IDs trigger the handler. Empty means all actions. */
   actionIds: string[];
   handler: ActionHandler;
+}
+
+interface ModalSubmitPattern {
+  callbackIds: string[];
+  handler: ModalSubmitHandler;
+}
+
+interface ModalClosePattern {
+  callbackIds: string[];
+  handler: ModalCloseHandler;
 }
 
 /**
@@ -104,6 +121,8 @@ export class Chat<
   private subscribedMessageHandlers: SubscribedMessageHandler<TState>[] = [];
   private reactionHandlers: ReactionPattern[] = [];
   private actionHandlers: ActionPattern[] = [];
+  private modalSubmitHandlers: ModalSubmitPattern[] = [];
+  private modalCloseHandlers: ModalClosePattern[] = [];
 
   /** Initialization state */
   private initPromise: Promise<void> | null = null;
@@ -391,6 +410,50 @@ export class Chat<
     }
   }
 
+  onModalSubmit(handler: ModalSubmitHandler): void;
+  onModalSubmit(callbackId: string, handler: ModalSubmitHandler): void;
+  onModalSubmit(callbackIds: string[], handler: ModalSubmitHandler): void;
+  onModalSubmit(
+    callbackIdOrHandler: string | string[] | ModalSubmitHandler,
+    handler?: ModalSubmitHandler,
+  ): void {
+    if (typeof callbackIdOrHandler === "function") {
+      this.modalSubmitHandlers.push({
+        callbackIds: [],
+        handler: callbackIdOrHandler,
+      });
+      this.logger.debug("Registered modal submit handler for all modals");
+    } else if (handler) {
+      const callbackIds = Array.isArray(callbackIdOrHandler)
+        ? callbackIdOrHandler
+        : [callbackIdOrHandler];
+      this.modalSubmitHandlers.push({ callbackIds, handler });
+      this.logger.debug("Registered modal submit handler", { callbackIds });
+    }
+  }
+
+  onModalClose(handler: ModalCloseHandler): void;
+  onModalClose(callbackId: string, handler: ModalCloseHandler): void;
+  onModalClose(callbackIds: string[], handler: ModalCloseHandler): void;
+  onModalClose(
+    callbackIdOrHandler: string | string[] | ModalCloseHandler,
+    handler?: ModalCloseHandler,
+  ): void {
+    if (typeof callbackIdOrHandler === "function") {
+      this.modalCloseHandlers.push({
+        callbackIds: [],
+        handler: callbackIdOrHandler,
+      });
+      this.logger.debug("Registered modal close handler for all modals");
+    } else if (handler) {
+      const callbackIds = Array.isArray(callbackIdOrHandler)
+        ? callbackIdOrHandler
+        : [callbackIdOrHandler];
+      this.modalCloseHandlers.push({ callbackIds, handler });
+      this.logger.debug("Registered modal close handler", { callbackIds });
+    }
+  }
+
   /**
    * Get an adapter by name with type safety.
    */
@@ -452,7 +515,7 @@ export class Chat<
    * Handles waitUntil registration and error catching internally.
    */
   processAction(
-    event: Omit<ActionEvent, "thread"> & { adapter: Adapter },
+    event: Omit<ActionEvent, "thread" | "openModal"> & { adapter: Adapter },
     options?: WebhookOptions,
   ): void {
     const task = this.handleActionEvent(event).catch((err) => {
@@ -468,11 +531,72 @@ export class Chat<
     }
   }
 
+  async processModalSubmit(
+    event: Omit<ModalSubmitEvent, "thread">,
+    _options?: WebhookOptions,
+  ): Promise<ModalResponse | undefined> {
+    this.logger.debug("Incoming modal submit", {
+      adapter: event.adapter.name,
+      callbackId: event.callbackId,
+      viewId: event.viewId,
+      user: event.user.userName,
+    });
+
+    // Run matching handlers, return first response
+    for (const { callbackIds, handler } of this.modalSubmitHandlers) {
+      if (callbackIds.length === 0 || callbackIds.includes(event.callbackId)) {
+        try {
+          const response = await handler(event as ModalSubmitEvent);
+          if (response) {
+            return response;
+          }
+        } catch (err) {
+          this.logger.error("Modal submit handler error", {
+            error: err,
+            callbackId: event.callbackId,
+          });
+        }
+      }
+    }
+  }
+
+  processModalClose(
+    event: Omit<ModalCloseEvent, "thread">,
+    options?: WebhookOptions,
+  ): void {
+    const task = (async () => {
+      this.logger.debug("Incoming modal close", {
+        adapter: event.adapter.name,
+        callbackId: event.callbackId,
+        viewId: event.viewId,
+        user: event.user.userName,
+      });
+
+      for (const { callbackIds, handler } of this.modalCloseHandlers) {
+        if (
+          callbackIds.length === 0 ||
+          callbackIds.includes(event.callbackId)
+        ) {
+          await handler(event as ModalCloseEvent);
+        }
+      }
+    })().catch((err) => {
+      this.logger.error("Modal close handler error", {
+        error: err,
+        callbackId: event.callbackId,
+      });
+    });
+
+    if (options?.waitUntil) {
+      options.waitUntil(task);
+    }
+  }
+
   /**
    * Handle an action event internally.
    */
   private async handleActionEvent(
-    event: Omit<ActionEvent, "thread"> & { adapter: Adapter },
+    event: Omit<ActionEvent, "thread" | "openModal"> & { adapter: Adapter },
   ): Promise<void> {
     this.logger.debug("Incoming action", {
       adapter: event.adapter.name,
@@ -500,10 +624,34 @@ export class Chat<
       isSubscribed,
     );
 
-    // Build full event with thread
+    // Build full event with thread and openModal helper
     const fullEvent: ActionEvent = {
       ...event,
       thread,
+      openModal: async (modal) => {
+        if (!event.triggerId) {
+          this.logger.warn("Cannot open modal: no triggerId available");
+          return undefined;
+        }
+        if (!event.adapter.openModal) {
+          this.logger.warn(
+            `Cannot open modal: ${event.adapter.name} does not support modals`,
+          );
+          return undefined;
+        }
+
+        // Convert JSX to ModalElement if needed (same pattern as thread.post)
+        let modalElement: ModalElement = modal as ModalElement;
+        if (isJSX(modal)) {
+          const converted = toModalElement(modal);
+          if (!converted) {
+            throw new Error("Invalid JSX element: must be a Modal element");
+          }
+          modalElement = converted;
+        }
+
+        return event.adapter.openModal(event.triggerId, modalElement);
+      },
     };
 
     // Run matching handlers

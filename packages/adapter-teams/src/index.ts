@@ -462,22 +462,23 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       serviceUrl: activity.serviceUrl || "",
     });
 
-    const actionEvent: Omit<ActionEvent, "thread"> & { adapter: TeamsAdapter } =
-      {
-        actionId: actionValue.actionId,
-        value: actionValue.value,
-        user: {
-          userId: activity.from?.id || "unknown",
-          userName: activity.from?.name || "unknown",
-          fullName: activity.from?.name || "unknown",
-          isBot: false,
-          isMe: false,
-        },
-        messageId: activity.replyToId || activity.id || "",
-        threadId,
-        adapter: this,
-        raw: activity,
-      };
+    const actionEvent: Omit<ActionEvent, "thread" | "openModal"> & {
+      adapter: TeamsAdapter;
+    } = {
+      actionId: actionValue.actionId,
+      value: actionValue.value,
+      user: {
+        userId: activity.from?.id || "unknown",
+        userName: activity.from?.name || "unknown",
+        fullName: activity.from?.name || "unknown",
+        isBot: false,
+        isMe: false,
+      },
+      messageId: activity.replyToId || activity.id || "",
+      threadId,
+      adapter: this,
+      raw: activity,
+    };
 
     this.logger.debug("Processing Teams message action (Action.Submit)", {
       actionId: actionValue.actionId,
@@ -542,22 +543,23 @@ export class TeamsAdapter implements Adapter<TeamsThreadId, unknown> {
       serviceUrl: activity.serviceUrl || "",
     });
 
-    const actionEvent: Omit<ActionEvent, "thread"> & { adapter: TeamsAdapter } =
-      {
-        actionId: actionData.actionId,
-        value: actionData.value,
-        user: {
-          userId: activity.from?.id || "unknown",
-          userName: activity.from?.name || "unknown",
-          fullName: activity.from?.name || "unknown",
-          isBot: false,
-          isMe: false,
-        },
-        messageId: activity.replyToId || activity.id || "",
-        threadId,
-        adapter: this,
-        raw: activity,
-      };
+    const actionEvent: Omit<ActionEvent, "thread" | "openModal"> & {
+      adapter: TeamsAdapter;
+    } = {
+      actionId: actionData.actionId,
+      value: actionData.value,
+      user: {
+        userId: activity.from?.id || "unknown",
+        userName: activity.from?.name || "unknown",
+        fullName: activity.from?.name || "unknown",
+        isBot: false,
+        isMe: false,
+      },
+      messageId: activity.replyToId || activity.id || "",
+      threadId,
+      adapter: this,
+      raw: activity,
+    };
 
     this.logger.debug("Processing Teams adaptive card action", {
       actionId: actionData.actionId,

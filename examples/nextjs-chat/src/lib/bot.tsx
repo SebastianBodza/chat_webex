@@ -11,8 +11,12 @@ import {
   emoji,
   Field,
   Fields,
+  Modal,
   Section,
+  Select,
+  SelectOption,
   CardText as Text,
+  TextInput,
 } from "chat";
 import { buildAdapters } from "./adapters";
 
@@ -89,6 +93,7 @@ bot.onNewMention(async (thread, message) => {
           Say Hello
         </Button>
         <Button id="info">Show Info</Button>
+        <Button id="feedback">Send Feedback</Button>
         <Button id="messages">Fetch Messages</Button>
         <Button id="goodbye" style="danger">
           Goodbye
@@ -125,6 +130,78 @@ bot.onAction("goodbye", async (event) => {
   await event.thread.post(
     `${emoji.wave} Goodbye, ${event.user.fullName}! See you later.`,
   );
+});
+
+// Open feedback modal
+bot.onAction("feedback", async (event) => {
+  await event.openModal(
+    <Modal
+      callbackId="feedback_form"
+      title="Send Feedback"
+      submitLabel="Send"
+      closeLabel="Cancel"
+      notifyOnClose
+      privateMetadata={event.threadId}
+    >
+      <TextInput
+        id="message"
+        label="Your Feedback"
+        placeholder="Tell us what you think..."
+        multiline
+      />
+      <Select id="category" label="Category" placeholder="Select a category">
+        <SelectOption label="Bug Report" value="bug" />
+        <SelectOption label="Feature Request" value="feature" />
+        <SelectOption label="General Feedback" value="general" />
+        <SelectOption label="Other" value="other" />
+      </Select>
+      <TextInput
+        id="email"
+        label="Email (optional)"
+        placeholder="your@email.com"
+        optional
+      />
+    </Modal>,
+  );
+});
+
+// Handle modal submission
+bot.onModalSubmit("feedback_form", async (event) => {
+  const { message, category, email } = event.values;
+
+  // Validate message
+  if (!message || message.length < 5) {
+    return {
+      action: "errors" as const,
+      errors: { message: "Feedback must be at least 5 characters" },
+    };
+  }
+
+  // Log the feedback
+  console.log("Received feedback:", {
+    message,
+    category,
+    email,
+    user: event.user.userName,
+  });
+
+  // Post confirmation to the original thread
+  if (event.privateMetadata) {
+    // We need to post to the thread
+    const adapter = event.adapter;
+    await adapter.postMessage(
+      event.privateMetadata,
+      `${emoji.check} **Feedback received!**\n\n` +
+        `**Category:** ${category}\n` +
+        `**Message:** ${message}` +
+        (email ? `\n**Email:** ${email}` : ""),
+    );
+  }
+});
+
+// Handle modal close (cancel)
+bot.onModalClose("feedback_form", async (event) => {
+  console.log(`${event.user.userName} cancelled the feedback form`);
 });
 
 // Demonstrate fetchMessages and allMessages

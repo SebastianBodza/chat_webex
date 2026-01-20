@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chat } from "./chat";
 import { getEmoji } from "./emoji";
+import { jsx } from "./jsx-runtime";
 import { parseMarkdown } from "./markdown";
+import { Modal, type ModalElement, TextInput } from "./modals";
 import type {
   ActionEvent,
   Adapter,
@@ -60,6 +62,7 @@ function createMockAdapter(name: string): Adapter {
     isDM: vi
       .fn()
       .mockImplementation((threadId: string) => threadId.includes(":D")),
+    openModal: vi.fn().mockResolvedValue({ viewId: "V123" }),
   };
 }
 
@@ -698,7 +701,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         value: "order-123",
         user: {
@@ -728,7 +731,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(["approve", "reject"], handler);
 
-      const approveEvent: Omit<ActionEvent, "thread"> = {
+      const approveEvent: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -743,7 +746,7 @@ describe("Chat", () => {
         raw: {},
       };
 
-      const skipEvent: Omit<ActionEvent, "thread"> = {
+      const skipEvent: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "skip",
         user: {
           userId: "U123",
@@ -771,7 +774,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction("approve", handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -796,7 +799,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "BOT",
@@ -821,7 +824,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -852,7 +855,7 @@ describe("Chat", () => {
       });
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -874,6 +877,185 @@ describe("Chat", () => {
       expect(mockAdapter.postMessage).toHaveBeenCalledWith(
         "slack:C123:1234.5678",
         "Action received!",
+      );
+    });
+
+    it("should provide openModal method that calls adapter.openModal", async () => {
+      let capturedEvent: ActionEvent | undefined;
+      const handler = vi.fn().mockImplementation(async (event: ActionEvent) => {
+        capturedEvent = event;
+      });
+      chat.onAction(handler);
+
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
+        actionId: "open_form",
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+        triggerId: "trigger-123",
+      };
+
+      chat.processAction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalled();
+      expect(capturedEvent?.openModal).toBeDefined();
+
+      // Call openModal with a ModalElement
+      const modal: ModalElement = {
+        type: "modal",
+        callbackId: "test_modal",
+        title: "Test Modal",
+        children: [],
+      };
+      const result = await capturedEvent?.openModal(modal);
+
+      expect(mockAdapter.openModal).toHaveBeenCalledWith("trigger-123", modal);
+      expect(result).toEqual({ viewId: "V123" });
+    });
+
+    it("should convert JSX Modal to ModalElement in openModal", async () => {
+      let capturedEvent: ActionEvent | undefined;
+      const handler = vi.fn().mockImplementation(async (event: ActionEvent) => {
+        capturedEvent = event;
+      });
+      chat.onAction(handler);
+
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
+        actionId: "open_form",
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+        triggerId: "trigger-123",
+      };
+
+      chat.processAction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Call openModal with a JSX Modal element
+      const jsxModal = jsx(Modal, {
+        callbackId: "jsx_modal",
+        title: "JSX Modal",
+        children: [jsx(TextInput, { id: "name", label: "Name" })],
+      });
+      const result = await capturedEvent?.openModal(jsxModal);
+
+      // Should have converted JSX to ModalElement before calling adapter
+      expect(mockAdapter.openModal).toHaveBeenCalledWith(
+        "trigger-123",
+        expect.objectContaining({
+          type: "modal",
+          callbackId: "jsx_modal",
+          title: "JSX Modal",
+        }),
+      );
+      expect(result).toEqual({ viewId: "V123" });
+    });
+
+    it("should return undefined from openModal when triggerId is missing", async () => {
+      let capturedEvent: ActionEvent | undefined;
+      const handler = vi.fn().mockImplementation(async (event: ActionEvent) => {
+        capturedEvent = event;
+      });
+      chat.onAction(handler);
+
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
+        actionId: "open_form",
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        raw: {},
+        // No triggerId
+      };
+
+      chat.processAction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalled();
+
+      const modal: ModalElement = {
+        type: "modal",
+        callbackId: "test_modal",
+        title: "Test Modal",
+        children: [],
+      };
+      const result = await capturedEvent?.openModal(modal);
+
+      expect(result).toBeUndefined();
+      expect(mockAdapter.openModal).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        "Cannot open modal: no triggerId available",
+      );
+    });
+
+    it("should return undefined from openModal when adapter does not support modals", async () => {
+      // Create adapter without openModal
+      const adapterWithoutModals: Adapter = {
+        ...mockAdapter,
+        openModal: undefined,
+      };
+
+      let capturedEvent: ActionEvent | undefined;
+      const handler = vi.fn().mockImplementation(async (event: ActionEvent) => {
+        capturedEvent = event;
+      });
+      chat.onAction(handler);
+
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
+        actionId: "open_form",
+        user: {
+          userId: "U123",
+          userName: "user",
+          fullName: "Test User",
+          isBot: false,
+          isMe: false,
+        },
+        messageId: "msg-1",
+        threadId: "slack:C123:1234.5678",
+        adapter: adapterWithoutModals,
+        raw: {},
+        triggerId: "trigger-123",
+      };
+
+      chat.processAction(event);
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(handler).toHaveBeenCalled();
+
+      const modal: ModalElement = {
+        type: "modal",
+        callbackId: "test_modal",
+        title: "Test Modal",
+        children: [],
+      };
+      const result = await capturedEvent?.openModal(modal);
+
+      expect(result).toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        "Cannot open modal: slack does not support modals",
       );
     });
   });

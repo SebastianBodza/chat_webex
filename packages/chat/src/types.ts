@@ -6,6 +6,7 @@ import type { Root } from "mdast";
 import type { CardElement } from "./cards";
 import type { CardJSXElement } from "./jsx-runtime";
 import type { Logger, LogLevel } from "./logger";
+import type { ModalElement } from "./modals";
 
 // =============================================================================
 // Re-exports from extracted modules
@@ -208,6 +209,18 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
   isDM?(threadId: string): boolean;
 
   /**
+   * Open a modal/dialog form.
+   *
+   * @param triggerId - Platform-specific trigger ID from the action event
+   * @param modal - The modal element to display
+   * @returns The view/dialog ID
+   */
+  openModal?(
+    triggerId: string,
+    modal: ModalElement,
+  ): Promise<{ viewId: string }>;
+
+  /**
    * Stream a message using platform-native streaming APIs.
    *
    * The adapter consumes the async iterable and handles the entire streaming lifecycle.
@@ -285,7 +298,17 @@ export interface ChatInstance {
    * @param options - Webhook options including waitUntil
    */
   processAction(
-    event: Omit<ActionEvent, "thread"> & { adapter: Adapter },
+    event: Omit<ActionEvent, "thread" | "openModal"> & { adapter: Adapter },
+    options?: WebhookOptions,
+  ): void;
+
+  processModalSubmit(
+    event: Omit<ModalSubmitEvent, "thread">,
+    options?: WebhookOptions,
+  ): Promise<ModalResponse | undefined>;
+
+  processModalClose(
+    event: Omit<ModalCloseEvent, "thread">,
     options?: WebhookOptions,
   ): void;
 
@@ -1137,6 +1160,17 @@ export interface ActionEvent<TRawMessage = unknown> {
   adapter: Adapter;
   /** Platform-specific raw event data */
   raw: unknown;
+  /** Trigger ID for opening modals (required by some platforms, may expire quickly) */
+  triggerId?: string;
+  /**
+   * Open a modal/dialog form in response to this action.
+   *
+   * @param modal - The modal element to display (JSX or ModalElement)
+   * @returns The view/dialog ID, or undefined if modals are not supported
+   */
+  openModal(
+    modal: ModalElement | CardJSXElement,
+  ): Promise<{ viewId: string } | undefined>;
 }
 
 /**
@@ -1163,3 +1197,56 @@ export interface ActionEvent<TRawMessage = unknown> {
  * ```
  */
 export type ActionHandler = (event: ActionEvent) => Promise<void>;
+
+// =============================================================================
+// Modal Events (Form Submissions)
+// =============================================================================
+
+export interface ModalSubmitEvent {
+  callbackId: string;
+  viewId: string;
+  values: Record<string, string>;
+  privateMetadata?: string;
+  user: Author;
+  adapter: Adapter;
+  raw: unknown;
+}
+
+export interface ModalCloseEvent {
+  callbackId: string;
+  viewId: string;
+  user: Author;
+  adapter: Adapter;
+  raw: unknown;
+}
+
+export type ModalErrorsResponse = {
+  action: "errors";
+  errors: Record<string, string>;
+};
+
+export type ModalUpdateResponse = {
+  action: "update";
+  modal: import("./modals").ModalElement;
+};
+
+export type ModalPushResponse = {
+  action: "push";
+  modal: import("./modals").ModalElement;
+};
+
+export type ModalCloseResponse = {
+  action: "close";
+};
+
+export type ModalResponse =
+  | ModalCloseResponse
+  | ModalErrorsResponse
+  | ModalUpdateResponse
+  | ModalPushResponse;
+
+export type ModalSubmitHandler = (
+  event: ModalSubmitEvent,
+) => Promise<ModalResponse | undefined>;
+
+export type ModalCloseHandler = (event: ModalCloseEvent) => Promise<void>;
