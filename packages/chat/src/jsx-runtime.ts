@@ -47,6 +47,16 @@ import {
   type TextStyle,
 } from "./cards";
 
+import {
+  Modal,
+  type ModalChild,
+  type ModalElement,
+  Select,
+  SelectOption,
+  type SelectOptionElement,
+  TextInput,
+} from "./modals";
+
 // Symbol to identify our JSX elements before they're processed
 const JSX_ELEMENT = Symbol.for("chat.jsx.element");
 
@@ -97,6 +107,44 @@ export interface ContainerProps {
 /** Props for Divider component (no props) */
 export type DividerProps = Record<string, never>;
 
+/** Props for Modal component in JSX */
+export interface ModalProps {
+  callbackId: string;
+  title: string;
+  submitLabel?: string;
+  closeLabel?: string;
+  notifyOnClose?: boolean;
+  privateMetadata?: string;
+  children?: unknown;
+}
+
+/** Props for TextInput component in JSX */
+export interface TextInputProps {
+  id: string;
+  label: string;
+  placeholder?: string;
+  initialValue?: string;
+  multiline?: boolean;
+  optional?: boolean;
+  maxLength?: number;
+}
+
+/** Props for Select component in JSX */
+export interface SelectProps {
+  id: string;
+  label: string;
+  placeholder?: string;
+  initialOption?: string;
+  optional?: boolean;
+  children?: unknown;
+}
+
+/** Props for SelectOption component in JSX */
+export interface SelectOptionProps {
+  label: string;
+  value: string;
+}
+
 /** Union of all valid JSX props */
 export type CardJSXProps =
   | CardProps
@@ -105,7 +153,11 @@ export type CardJSXProps =
   | ImageProps
   | FieldProps
   | ContainerProps
-  | DividerProps;
+  | DividerProps
+  | ModalProps
+  | TextInputProps
+  | SelectProps
+  | SelectOptionProps;
 
 /** Component function type with proper overloads */
 type CardComponentFunction =
@@ -117,7 +169,11 @@ type CardComponentFunction =
   | typeof Divider
   | typeof Section
   | typeof Actions
-  | typeof Fields;
+  | typeof Fields
+  | typeof Modal
+  | typeof TextInput
+  | typeof Select
+  | typeof SelectOption;
 
 /**
  * Represents a JSX element from the chat JSX runtime.
@@ -188,6 +244,9 @@ type AnyCardElement =
   | CardChild
   | ButtonElement
   | FieldElement
+  | ModalElement
+  | ModalChild
+  | SelectOptionElement
   | null;
 
 /**
@@ -230,8 +289,42 @@ function isCardProps(props: CardJSXProps): props is CardProps {
   return (
     !("id" in props) &&
     !("url" in props) &&
+    !("callbackId" in props) &&
     ("title" in props || "subtitle" in props || "imageUrl" in props)
   );
+}
+
+/**
+ * Type guard to check if props match ModalProps
+ */
+function isModalProps(props: CardJSXProps): props is ModalProps {
+  return "callbackId" in props && "title" in props;
+}
+
+/**
+ * Type guard to check if props match TextInputProps
+ */
+function isTextInputProps(props: CardJSXProps): props is TextInputProps {
+  return (
+    "id" in props &&
+    "label" in props &&
+    !("options" in props) &&
+    !("value" in props)
+  );
+}
+
+/**
+ * Type guard to check if props match SelectProps
+ */
+function isSelectProps(props: CardJSXProps): props is SelectProps {
+  return "id" in props && "label" in props && !("value" in props);
+}
+
+/**
+ * Type guard to check if props match SelectOptionProps
+ */
+function isSelectOptionProps(props: CardJSXProps): props is SelectOptionProps {
+  return "label" in props && "value" in props && !("id" in props);
 }
 
 /**
@@ -312,6 +405,61 @@ function resolveJSXElement(element: JSXElement): AnyCardElement {
   if (type === Divider) {
     // Divider() - no args
     return Divider();
+  }
+
+  // Modal components
+  if (type === Modal) {
+    if (!isModalProps(props)) {
+      throw new Error("Modal requires 'callbackId' and 'title' props");
+    }
+    return Modal({
+      callbackId: props.callbackId,
+      title: props.title,
+      submitLabel: props.submitLabel,
+      closeLabel: props.closeLabel,
+      notifyOnClose: props.notifyOnClose,
+      privateMetadata: props.privateMetadata,
+      children: processedChildren as unknown as ModalChild[],
+    });
+  }
+
+  if (type === TextInput) {
+    if (!isTextInputProps(props)) {
+      throw new Error("TextInput requires 'id' and 'label' props");
+    }
+    return TextInput({
+      id: props.id,
+      label: props.label,
+      placeholder: props.placeholder,
+      initialValue: props.initialValue,
+      multiline: props.multiline,
+      optional: props.optional,
+      maxLength: props.maxLength,
+    });
+  }
+
+  if (type === Select) {
+    if (!isSelectProps(props)) {
+      throw new Error("Select requires 'id' and 'label' props");
+    }
+    return Select({
+      id: props.id,
+      label: props.label,
+      placeholder: props.placeholder,
+      initialOption: props.initialOption,
+      optional: props.optional,
+      options: processedChildren as SelectOptionElement[],
+    });
+  }
+
+  if (type === SelectOption) {
+    if (!isSelectOptionProps(props)) {
+      throw new Error("SelectOption requires 'label' and 'value' props");
+    }
+    return SelectOption({
+      label: props.label,
+      value: props.value,
+    });
   }
 
   // Default: Card({ title, subtitle, imageUrl, children })

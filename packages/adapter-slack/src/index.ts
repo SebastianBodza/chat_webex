@@ -21,6 +21,8 @@ import type {
   FormattedContent,
   Logger,
   Message,
+  ModalElement,
+  ModalResponse,
   RawMessage,
   ReactionEvent,
   StreamOptions,
@@ -35,6 +37,7 @@ import {
 } from "chat";
 import { cardToBlockKit, cardToFallbackText } from "./cards";
 import { SlackFormatConverter } from "./markdown";
+import { modalToSlackView, type SlackModalResponse } from "./modals";
 
 export interface SlackAdapterConfig {
   /** Bot token (xoxb-...) */
@@ -106,6 +109,7 @@ interface SlackWebhookPayload {
 /** Slack interactive payload (block_actions) for button clicks */
 interface SlackBlockActionsPayload {
   type: "block_actions";
+  trigger_id: string;
   user: {
     id: string;
     username: string;
@@ -134,6 +138,46 @@ interface SlackBlockActionsPayload {
   }>;
   response_url?: string;
 }
+
+interface SlackViewSubmissionPayload {
+  type: "view_submission";
+  trigger_id: string;
+  user: {
+    id: string;
+    username: string;
+    name?: string;
+  };
+  view: {
+    id: string;
+    callback_id: string;
+    private_metadata?: string;
+    state: {
+      values: Record<
+        string,
+        Record<string, { value?: string; selected_option?: { value: string } }>
+      >;
+    };
+  };
+}
+
+interface SlackViewClosedPayload {
+  type: "view_closed";
+  user: {
+    id: string;
+    username: string;
+    name?: string;
+  };
+  view: {
+    id: string;
+    callback_id: string;
+    private_metadata?: string;
+  };
+}
+
+type SlackInteractivePayload =
+  | SlackBlockActionsPayload
+  | SlackViewSubmissionPayload
+  | SlackViewClosedPayload;
 
 /** Cached user info */
 interface CachedUser {
@@ -306,14 +350,13 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
   }
 
   /**
-   * Handle Slack interactive payloads (button clicks, etc.).
+   * Handle Slack interactive payloads (button clicks, view submissions, etc.).
    * These are sent as form-urlencoded with a `payload` JSON field.
    */
   private handleInteractivePayload(
     body: string,
     options?: WebhookOptions,
-  ): Response {
-    // Parse form-urlencoded body
+  ): Response | Promise<Response> {
     const params = new URLSearchParams(body);
     const payloadStr = params.get("payload");
 
@@ -321,20 +364,28 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       return new Response("Missing payload", { status: 400 });
     }
 
-    let payload: SlackBlockActionsPayload;
+    let payload: SlackInteractivePayload;
     try {
       payload = JSON.parse(payloadStr);
     } catch {
       return new Response("Invalid payload JSON", { status: 400 });
     }
 
-    // Handle block_actions (button clicks)
-    if (payload.type === "block_actions") {
-      this.handleBlockActions(payload, options);
-    }
+    switch (payload.type) {
+      case "block_actions":
+        this.handleBlockActions(payload, options);
+        return new Response("", { status: 200 });
 
-    // Respond immediately - Slack requires fast responses for interactions
-    return new Response("", { status: 200 });
+      case "view_submission":
+        return this.handleViewSubmission(payload, options);
+
+      case "view_closed":
+        this.handleViewClosed(payload, options);
+        return new Response("", { status: 200 });
+
+      default:
+        return new Response("", { status: 200 });
+    }
   }
 
   /**
@@ -368,7 +419,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
 
     // Process each action (usually just one, but can be multiple)
     for (const action of payload.actions) {
-      const actionEvent: Omit<ActionEvent, "thread"> & {
+      const actionEvent: Omit<ActionEvent, "thread" | "openModal"> & {
         adapter: SlackAdapter;
       } = {
         actionId: action.action_id,
@@ -384,6 +435,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
         threadId,
         adapter: this,
         raw: payload,
+        triggerId: payload.trigger_id,
       };
 
       this.logger.debug("Processing Slack block action", {
@@ -391,9 +443,117 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
         value: action.value,
         messageId: messageTs,
         threadId,
+        triggerId: payload.trigger_id,
       });
 
       this.chat.processAction(actionEvent, options);
+    }
+  }
+
+  private async handleViewSubmission(
+    payload: SlackViewSubmissionPayload,
+    options?: WebhookOptions,
+  ): Promise<Response> {
+    if (!this.chat) {
+      this.logger.warn(
+        "Chat instance not initialized, ignoring view submission",
+      );
+      return new Response("", { status: 200 });
+    }
+
+    // Flatten values from Slack's nested structure
+    const values: Record<string, string> = {};
+    for (const blockValues of Object.values(payload.view.state.values)) {
+      for (const [actionId, input] of Object.entries(blockValues)) {
+        values[actionId] = input.value ?? input.selected_option?.value ?? "";
+      }
+    }
+
+    const event = {
+      callbackId: payload.view.callback_id,
+      viewId: payload.view.id,
+      values,
+      privateMetadata: payload.view.private_metadata,
+      user: {
+        userId: payload.user.id,
+        userName: payload.user.username || payload.user.name || "unknown",
+        fullName: payload.user.name || payload.user.username || "unknown",
+        isBot: false,
+        isMe: false,
+      },
+      adapter: this as Adapter,
+      raw: payload,
+    };
+
+    this.logger.debug("Processing Slack view submission", {
+      callbackId: payload.view.callback_id,
+      viewId: payload.view.id,
+      user: payload.user.username,
+    });
+
+    const response = await this.chat.processModalSubmit(event, options);
+
+    if (response) {
+      const slackResponse = this.modalResponseToSlack(response);
+      return new Response(JSON.stringify(slackResponse), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response("", { status: 200 });
+  }
+
+  private handleViewClosed(
+    payload: SlackViewClosedPayload,
+    options?: WebhookOptions,
+  ): void {
+    if (!this.chat) {
+      this.logger.warn("Chat instance not initialized, ignoring view closed");
+      return;
+    }
+
+    const event = {
+      callbackId: payload.view.callback_id,
+      viewId: payload.view.id,
+      user: {
+        userId: payload.user.id,
+        userName: payload.user.username || payload.user.name || "unknown",
+        fullName: payload.user.name || payload.user.username || "unknown",
+        isBot: false,
+        isMe: false,
+      },
+      adapter: this as Adapter,
+      raw: payload,
+    };
+
+    this.logger.debug("Processing Slack view closed", {
+      callbackId: payload.view.callback_id,
+      viewId: payload.view.id,
+      user: payload.user.username,
+    });
+
+    this.chat.processModalClose(event, options);
+  }
+
+  private modalResponseToSlack(response: ModalResponse): SlackModalResponse {
+    switch (response.action) {
+      case "close":
+        return {};
+      case "errors":
+        return { response_action: "errors", errors: response.errors };
+      case "update":
+        return {
+          response_action: "update",
+          view: modalToSlackView(response.modal),
+        };
+      case "push":
+        return {
+          response_action: "push",
+          view: modalToSlackView(response.modal),
+        };
+      default:
+        return {};
     }
   }
 
@@ -736,6 +896,62 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
         threadId,
         raw: result,
       };
+    } catch (error) {
+      this.handleSlackError(error);
+    }
+  }
+
+  async openModal(
+    triggerId: string,
+    modal: ModalElement,
+  ): Promise<{ viewId: string }> {
+    const view = modalToSlackView(modal);
+
+    this.logger.debug("Slack API: views.open", {
+      triggerId,
+      callbackId: modal.callbackId,
+    });
+
+    try {
+      const result = await this.client.views.open({
+        trigger_id: triggerId,
+        view,
+      });
+
+      this.logger.debug("Slack API: views.open response", {
+        viewId: result.view?.id,
+        ok: result.ok,
+      });
+
+      return { viewId: result.view?.id as string };
+    } catch (error) {
+      this.handleSlackError(error);
+    }
+  }
+
+  async updateModal(
+    viewId: string,
+    modal: ModalElement,
+  ): Promise<{ viewId: string }> {
+    const view = modalToSlackView(modal);
+
+    this.logger.debug("Slack API: views.update", {
+      viewId,
+      callbackId: modal.callbackId,
+    });
+
+    try {
+      const result = await this.client.views.update({
+        view_id: viewId,
+        view,
+      });
+
+      this.logger.debug("Slack API: views.update response", {
+        viewId: result.view?.id,
+        ok: result.ok,
+      });
+
+      return { viewId: result.view?.id as string };
     } catch (error) {
       this.handleSlackError(error);
     }

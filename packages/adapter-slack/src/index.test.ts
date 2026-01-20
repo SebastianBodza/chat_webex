@@ -13,6 +13,7 @@ const mockLogger: Logger = {
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
+  child: vi.fn(() => mockLogger),
 };
 
 // ============================================================================
@@ -435,6 +436,101 @@ describe("handleWebhook - interactive payloads", () => {
 
     const response = await adapter.handleWebhook(request);
     expect(response.status).toBe(400);
+  });
+
+  it("handles view_submission payload", async () => {
+    const payload = JSON.stringify({
+      type: "view_submission",
+      trigger_id: "trigger123",
+      user: {
+        id: "U123",
+        username: "testuser",
+        name: "Test User",
+      },
+      view: {
+        id: "V123",
+        callback_id: "feedback_form",
+        private_metadata: "thread-context",
+        state: {
+          values: {
+            message_block: {
+              message_input: { value: "Great feedback!" },
+            },
+            category_block: {
+              category_select: { selected_option: { value: "feature" } },
+            },
+          },
+        },
+      },
+    });
+    const body = `payload=${encodeURIComponent(payload)}`;
+    const request = createWebhookRequest(body, secret, {
+      contentType: "application/x-www-form-urlencoded",
+    });
+
+    const response = await adapter.handleWebhook(request);
+    expect(response.status).toBe(200);
+  });
+
+  it("handles view_closed payload", async () => {
+    const payload = JSON.stringify({
+      type: "view_closed",
+      user: {
+        id: "U123",
+        username: "testuser",
+        name: "Test User",
+      },
+      view: {
+        id: "V123",
+        callback_id: "feedback_form",
+        private_metadata: "thread-context",
+      },
+    });
+    const body = `payload=${encodeURIComponent(payload)}`;
+    const request = createWebhookRequest(body, secret, {
+      contentType: "application/x-www-form-urlencoded",
+    });
+
+    const response = await adapter.handleWebhook(request);
+    expect(response.status).toBe(200);
+  });
+
+  it("includes trigger_id in block_actions event", async () => {
+    const payload = JSON.stringify({
+      type: "block_actions",
+      trigger_id: "trigger456",
+      user: {
+        id: "U123",
+        username: "testuser",
+        name: "Test User",
+      },
+      container: {
+        type: "message",
+        message_ts: "1234567890.123456",
+        channel_id: "C456",
+      },
+      channel: {
+        id: "C456",
+        name: "general",
+      },
+      message: {
+        ts: "1234567890.123456",
+      },
+      actions: [
+        {
+          type: "button",
+          action_id: "open_modal",
+          value: "modal-data",
+        },
+      ],
+    });
+    const body = `payload=${encodeURIComponent(payload)}`;
+    const request = createWebhookRequest(body, secret, {
+      contentType: "application/x-www-form-urlencoded",
+    });
+
+    const response = await adapter.handleWebhook(request);
+    expect(response.status).toBe(200);
   });
 });
 

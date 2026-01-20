@@ -60,6 +60,7 @@ function createMockAdapter(name: string): Adapter {
     isDM: vi
       .fn()
       .mockImplementation((threadId: string) => threadId.includes(":D")),
+    openModal: vi.fn().mockResolvedValue({ viewId: "V123" }),
   };
 }
 
@@ -698,7 +699,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         value: "order-123",
         user: {
@@ -728,7 +729,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(["approve", "reject"], handler);
 
-      const approveEvent: Omit<ActionEvent, "thread"> = {
+      const approveEvent: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -743,7 +744,7 @@ describe("Chat", () => {
         raw: {},
       };
 
-      const skipEvent: Omit<ActionEvent, "thread"> = {
+      const skipEvent: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "skip",
         user: {
           userId: "U123",
@@ -771,7 +772,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction("approve", handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -796,7 +797,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "BOT",
@@ -821,7 +822,7 @@ describe("Chat", () => {
       const handler = vi.fn().mockResolvedValue(undefined);
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",
@@ -852,7 +853,7 @@ describe("Chat", () => {
       });
       chat.onAction(handler);
 
-      const event: Omit<ActionEvent, "thread"> = {
+      const event: Omit<ActionEvent, "thread" | "openModal"> = {
         actionId: "approve",
         user: {
           userId: "U123",

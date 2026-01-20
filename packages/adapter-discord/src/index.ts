@@ -316,7 +316,7 @@ export class DiscordAdapter implements Adapter<DiscordThreadId, unknown> {
       channelId,
     });
 
-    const actionEvent: Omit<ActionEvent, "thread"> & {
+    const actionEvent: Omit<ActionEvent, "thread" | "openModal"> & {
       adapter: DiscordAdapter;
     } = {
       actionId: customId,
