@@ -11,6 +11,7 @@ A unified SDK for building chat bots across Slack, Microsoft Teams, Google Chat,
 - **AI SDK integration** - Stream LLM responses directly to chat
 - **Rich cards with buttons** - TSX or object-based cards
 - **Action callbacks** - Handle button clicks across platforms
+- **Modals & form inputs** - Collect user input via modal dialogs
 - **File uploads** - Send files with messages
 - **DM support** - Initiate direct messages programmatically
 - Message deduplication for platform quirks
@@ -196,6 +197,10 @@ import {
   Field,
   Divider,
   Image,
+  Modal,
+  TextInput,
+  Select,
+  SelectOption,
 } from "chat";
 
 // Simple card with buttons
@@ -266,7 +271,137 @@ bot.onAction(async (event: ActionEvent) => {
 });
 ```
 
-The `ActionEvent` includes `actionId`, `value`, `user`, `thread`, `messageId`, `threadId`, `adapter`, and `raw` properties.
+The `ActionEvent` includes `actionId`, `value`, `user`, `thread`, `messageId`, `threadId`, `adapter`, `triggerId`, and `raw` properties.
+
+## Modals & Form Inputs
+
+Open modal dialogs to collect structured user input. Modals support text inputs, dropdowns, and validation. Currently supported on Slack.
+
+### Opening a Modal
+
+Modals are opened in response to button clicks using `event.openModal()`:
+
+```tsx
+import {
+  Modal,
+  TextInput,
+  Select,
+  SelectOption,
+} from "chat";
+
+// Handle a button click that opens a modal
+bot.onAction("feedback", async (event) => {
+  await event.openModal(
+    <Modal
+      callbackId="feedback_form"
+      title="Send Feedback"
+      submitLabel="Send"
+      closeLabel="Cancel"
+      notifyOnClose
+      privateMetadata={event.threadId}
+    >
+      <TextInput
+        id="message"
+        label="Your Feedback"
+        placeholder="Tell us what you think..."
+        multiline
+      />
+      <Select id="category" label="Category" placeholder="Select a category">
+        <SelectOption label="Bug Report" value="bug" />
+        <SelectOption label="Feature Request" value="feature" />
+        <SelectOption label="General Feedback" value="general" />
+      </Select>
+      <TextInput
+        id="email"
+        label="Email (optional)"
+        placeholder="your@email.com"
+        optional
+      />
+    </Modal>
+  );
+});
+```
+
+### Modal Components
+
+| Component | Description |
+|-----------|-------------|
+| `Modal` | Container with `callbackId`, `title`, `submitLabel`, `closeLabel`, `notifyOnClose`, `privateMetadata` |
+| `TextInput` | Text field with `id`, `label`, `placeholder`, `initialValue`, `multiline`, `optional`, `maxLength` |
+| `Select` | Dropdown with `id`, `label`, `placeholder`, `initialOption`, `optional` |
+| `SelectOption` | Option for Select with `label` and `value` |
+
+### Handling Modal Submissions
+
+Handle form submissions with `onModalSubmit`:
+
+```typescript
+import type { ModalSubmitEvent } from "chat";
+
+bot.onModalSubmit("feedback_form", async (event: ModalSubmitEvent) => {
+  const { message, category, email } = event.values;
+
+  // Validate input - return errors to show in the modal
+  if (!message || message.length < 5) {
+    return {
+      action: "errors",
+      errors: { message: "Feedback must be at least 5 characters" },
+    };
+  }
+
+  // Process the submission
+  console.log("Received feedback:", { message, category, email });
+
+  // Post confirmation to the original thread
+  if (event.privateMetadata) {
+    await event.adapter.postMessage(
+      event.privateMetadata,
+      `Feedback received! Category: ${category}`
+    );
+  }
+
+  // Return nothing to close the modal
+});
+```
+
+### Modal Response Types
+
+Return different responses from `onModalSubmit` to control modal behavior:
+
+```typescript
+// Close the modal (default if nothing returned)
+return { action: "close" };
+
+// Show validation errors
+return {
+  action: "errors",
+  errors: { fieldId: "Error message" },
+};
+
+// Update the modal content
+return {
+  action: "update",
+  modal: <Modal callbackId="updated" title="Updated!">{/* ... */}</Modal>,
+};
+
+// Push a new modal view onto the stack
+return {
+  action: "push",
+  modal: <Modal callbackId="step2" title="Step 2">{/* ... */}</Modal>,
+};
+```
+
+### Handling Modal Close
+
+Optionally handle when users close/cancel a modal (requires `notifyOnClose` on the Modal):
+
+```typescript
+bot.onModalClose("feedback_form", async (event) => {
+  console.log(`${event.user.userName} cancelled the feedback form`);
+});
+```
+
+The `ModalSubmitEvent` includes `callbackId`, `viewId`, `values`, `privateMetadata`, `user`, `adapter`, and `raw` properties.
 
 ## AI Integration & Streaming
 
