@@ -1,5 +1,11 @@
 # chat
 
+## 4.4.0
+
+### Minor Changes
+
+- 8ca6371: Add support for modals, modal events, text inputs and selectors.
+
 ## 4.3.0
 
 ### Minor Changes

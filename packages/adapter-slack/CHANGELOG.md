@@ -1,5 +1,17 @@
 # @chat-adapter/slack
 
+## 4.4.0
+
+### Minor Changes
+
+- 8ca6371: Add support for modals, modal events, text inputs and selectors.
+
+### Patch Changes
+
+- Updated dependencies [8ca6371]
+  - chat@4.4.0
+  - @chat-adapter/shared@4.4.0
+
 ## 4.3.0
 
 ### Minor Changes
