@@ -368,28 +368,12 @@ bot.onModalSubmit("feedback_form", async (event: ModalSubmitEvent) => {
 
 Return different responses from `onModalSubmit` to control modal behavior:
 
-```typescript
-// Close the modal (default if nothing returned)
-return { action: "close" };
-
-// Show validation errors
-return {
-  action: "errors",
-  errors: { fieldId: "Error message" },
-};
-
-// Update the modal content
-return {
-  action: "update",
-  modal: <Modal callbackId="updated" title="Updated!">{/* ... */}</Modal>,
-};
-
-// Push a new modal view onto the stack
-return {
-  action: "push",
-  modal: <Modal callbackId="step2" title="Step 2">{/* ... */}</Modal>,
-};
-```
+| Response | Description |
+|----------|-------------|
+| `{ action: "close" }` | Close the modal (default if nothing returned) |
+| `{ action: "errors", errors: { fieldId: "Error message" } }` | Show validation errors on specific fields |
+| `{ action: "update", modal: ModalElement }` | Update the modal content |
+| `{ action: "push", modal: ModalElement }` | Push a new modal view onto the stack |
 
 ### Handling Modal Close
 
