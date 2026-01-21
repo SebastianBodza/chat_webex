@@ -186,7 +186,9 @@ describe("Main README.md code examples", () => {
 
       expect.fail(
         `README.md TypeScript code blocks failed type-checking:\n\n${output}\n\n` +
-          `Code blocks tested:\n${codeBlocks.map((b, i) => `--- Block ${i} ---\n${b}`).join("\n\n")}`,
+          `Code blocks tested:\n${codeBlocks
+            .map((b, i) => `--- Block ${i} ---\n${b}`)
+            .join("\n\n")}`,
       );
     }
 
