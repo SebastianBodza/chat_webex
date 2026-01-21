@@ -12,8 +12,11 @@ import type {
   Adapter,
   AdapterPostableMessage,
   Attachment,
+  Author,
+  EphemeralMessage,
   Message,
   PostableMessage,
+  PostEphemeralOptions,
   SentMessage,
   StateAdapter,
   StreamOptions,
@@ -195,6 +198,53 @@ export class ThreadImpl<TState = Record<string, unknown>>
 
     // Create a SentMessage with edit/delete capabilities
     return this.createSentMessage(rawMessage.id, postable, rawMessage.threadId);
+  }
+
+  async postEphemeral(
+    user: string | Author,
+    message: AdapterPostableMessage | CardJSXElement,
+    options: PostEphemeralOptions,
+  ): Promise<EphemeralMessage | null> {
+    const { fallbackToDM } = options;
+    const userId = typeof user === "string" ? user : user.userId;
+
+    // Convert JSX to card if needed
+    let postable: AdapterPostableMessage;
+    if (isJSX(message)) {
+      const card = toCardElement(message);
+      if (!card) {
+        throw new Error("Invalid JSX element: must be a Card element");
+      }
+      postable = card;
+    } else {
+      // Safe cast: if not JSX, it must be AdapterPostableMessage
+      postable = message as AdapterPostableMessage;
+    }
+
+    // Try native ephemeral if adapter supports it
+    if (this.adapter.postEphemeral) {
+      return this.adapter.postEphemeral(this.id, userId, postable);
+    }
+
+    // No native support - either fallback to DM or return null
+    if (!fallbackToDM) {
+      return null;
+    }
+
+    // Fallback: send via DM
+    if (this.adapter.openDM) {
+      const dmThreadId = await this.adapter.openDM(userId);
+      const result = await this.adapter.postMessage(dmThreadId, postable);
+      return {
+        id: result.id,
+        threadId: dmThreadId,
+        usedFallback: true,
+        raw: result.raw,
+      };
+    }
+
+    // No DM support either - return null
+    return null;
   }
 
   /**

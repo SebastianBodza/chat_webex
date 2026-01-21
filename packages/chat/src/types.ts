@@ -201,6 +201,23 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
   openDM?(userId: string): Promise<string>;
 
   /**
+   * Post an ephemeral message visible only to a specific user.
+   *
+   * This is optional - if not implemented, Thread.postEphemeral will
+   * fall back to openDM + postMessage when fallbackToDM is true.
+   *
+   * @param threadId - The thread to post in
+   * @param userId - The user who should see the message
+   * @param message - The message content
+   * @returns EphemeralMessage with usedFallback: false
+   */
+  postEphemeral?(
+    threadId: string,
+    userId: string,
+    message: AdapterPostableMessage,
+  ): Promise<EphemeralMessage>;
+
+  /**
    * Check if a thread is a direct message conversation.
    *
    * @param threadId - The thread ID to check
@@ -507,6 +524,40 @@ export interface Thread<
   ): Promise<SentMessage<TRawMessage>>;
 
   /**
+   * Post an ephemeral message visible only to a specific user.
+   *
+   * **Platform Behavior:**
+   * - **Slack**: Native ephemeral (session-dependent, disappears on reload)
+   * - **Google Chat**: Native private message (persists, only target user sees it)
+   * - **Discord**: No native support - requires fallbackToDM: true
+   * - **Teams**: No native support - requires fallbackToDM: true
+   *
+   * @param user - User ID string or Author object (from message.author or event.user)
+   * @param message - Message content (string, markdown, card, etc.). Streaming is not supported.
+   * @param options.fallbackToDM - Required. If true, falls back to DM when native
+   *   ephemeral is not supported. If false, returns null when unsupported.
+   * @returns EphemeralMessage with `usedFallback: true` if DM was used, or null
+   *   if native ephemeral not supported and fallbackToDM is false
+   *
+   * @example
+   * ```typescript
+   * // Always send (DM fallback on Discord/Teams)
+   * await thread.postEphemeral(user, 'Only you can see this!', { fallbackToDM: true })
+   *
+   * // Only send if native ephemeral supported (Slack/GChat)
+   * const result = await thread.postEphemeral(user, 'Secret!', { fallbackToDM: false })
+   * if (!result) {
+   *   // Platform doesn't support native ephemeral - handle accordingly
+   * }
+   * ```
+   */
+  postEphemeral(
+    user: string | Author,
+    message: AdapterPostableMessage | CardJSXElement,
+    options: PostEphemeralOptions,
+  ): Promise<EphemeralMessage | null>;
+
+  /**
    * Show typing indicator in the thread.
    *
    * Some platforms support persistent typing indicators, others just send once.
@@ -712,6 +763,40 @@ export interface SentMessage<TRawMessage = unknown>
   addReaction(emoji: EmojiValue | string): Promise<void>;
   /** Remove a reaction from this message */
   removeReaction(emoji: EmojiValue | string): Promise<void>;
+}
+
+// =============================================================================
+// Ephemeral Message (returned from thread.postEphemeral())
+// =============================================================================
+
+/**
+ * Result of posting an ephemeral message.
+ *
+ * Ephemeral messages are visible only to a specific user and typically
+ * cannot be edited or deleted (platform-dependent).
+ */
+export interface EphemeralMessage {
+  /** Message ID (may be empty for some platforms) */
+  id: string;
+  /** Thread ID where message was sent (or DM thread if fallback was used) */
+  threadId: string;
+  /** Whether this used native ephemeral or fell back to DM */
+  usedFallback: boolean;
+  /** Platform-specific raw response */
+  raw: unknown;
+}
+
+/**
+ * Options for posting ephemeral messages.
+ */
+export interface PostEphemeralOptions {
+  /**
+   * Controls behavior when native ephemeral is not supported by the platform.
+   *
+   * - `true`: Falls back to sending a DM to the user
+   * - `false`: Returns `null` if native ephemeral is not supported
+   */
+  fallbackToDM: boolean;
 }
 
 // =============================================================================

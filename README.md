@@ -507,6 +507,64 @@ bot.onSubscribedMessage(async (thread, message) => {
 });
 ```
 
+## Ephemeral Messages
+
+Send a message visible only to a specific user:
+
+```typescript
+await thread.postEphemeral(user, "Only you can see this!", {
+  fallbackToDM: true,
+});
+```
+
+The `fallbackToDM` option is required and controls behavior on platforms without native ephemeral support:
+
+- `fallbackToDM: true` - Send as DM if native ephemeral isn't supported
+- `fallbackToDM: false` - Return `null` if native ephemeral isn't supported
+
+### Platform Behavior
+
+| Platform    | Native Support | Behavior             | Where it appears                            | Persistence                              |
+| ----------- | -------------- | -------------------- | ------------------------------------------- | ---------------------------------------- |
+| Slack       | Yes            | Ephemeral in channel | In the channel, only visible to target user | Session-only (disappears on page reload) |
+| Google Chat | Yes            | Private message      | In the space, only visible to target user   | Persists until deleted                   |
+| Discord     | No             | DM (if enabled)      | In a DM conversation with the bot           | Persists in DM                           |
+| Teams       | No             | DM (if enabled)      | In a DM conversation with the bot           | Persists in DM                           |
+
+**Key differences:**
+
+- **Slack**: True ephemeral - message appears in the channel context but disappears when the user refreshes. Other users never see it.
+- **Google Chat**: Private message viewer - message appears in the space but only the target user can see it. It persists and can be deleted by the bot.
+- **Discord/Teams**: No native ephemeral support. With `fallbackToDM: true`, sends a DM instead. With `fallbackToDM: false`, returns `null`.
+
+### Examples
+
+**Always deliver the message (DM fallback):**
+
+```typescript
+const result = await thread.postEphemeral(user, "Private notification", {
+  fallbackToDM: true,
+});
+
+if (result.usedFallback) {
+  // Was sent as DM on Discord/Teams
+  console.log(`Sent as DM: ${result.threadId}`);
+}
+```
+
+**Only send if native ephemeral is supported:**
+
+```typescript
+const result = await thread.postEphemeral(user, "Contextual hint", {
+  fallbackToDM: false,
+});
+
+if (!result) {
+  // Platform doesn't support native ephemeral (Discord/Teams)
+  // Message was not sent - handle accordingly or skip
+}
+```
+
 ## Development
 
 ```bash

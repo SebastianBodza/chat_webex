@@ -831,4 +831,131 @@ describe("ThreadImpl", () => {
       expect(cursors).toEqual([undefined, undefined]);
     });
   });
+
+  describe("postEphemeral", () => {
+    let thread: ThreadImpl;
+    let mockAdapter: Adapter;
+    let mockState: ReturnType<typeof createMockState>;
+
+    beforeEach(() => {
+      mockAdapter = createMockAdapter();
+      mockState = createMockState();
+
+      thread = new ThreadImpl({
+        id: "slack:C123:1234.5678",
+        adapter: mockAdapter,
+        channelId: "C123",
+        stateAdapter: mockState,
+      });
+    });
+
+    it("should use adapter postEphemeral when available", async () => {
+      const mockPostEphemeral = vi.fn().mockResolvedValue({
+        id: "ephemeral-1",
+        threadId: "slack:C123:1234.5678",
+        usedFallback: false,
+        raw: {},
+      });
+      mockAdapter.postEphemeral = mockPostEphemeral;
+
+      const result = await thread.postEphemeral("U456", "Secret message", {
+        fallbackToDM: true,
+      });
+
+      expect(mockPostEphemeral).toHaveBeenCalledWith(
+        "slack:C123:1234.5678",
+        "U456",
+        "Secret message",
+      );
+      expect(result).toEqual({
+        id: "ephemeral-1",
+        threadId: "slack:C123:1234.5678",
+        usedFallback: false,
+        raw: {},
+      });
+    });
+
+    it("should extract userId from Author object", async () => {
+      const mockPostEphemeral = vi.fn().mockResolvedValue({
+        id: "ephemeral-1",
+        threadId: "slack:C123:1234.5678",
+        usedFallback: false,
+        raw: {},
+      });
+      mockAdapter.postEphemeral = mockPostEphemeral;
+
+      const author = {
+        userId: "U789",
+        userName: "testuser",
+        fullName: "Test User",
+        isBot: false as const,
+        isMe: false as const,
+      };
+
+      await thread.postEphemeral(author, "Secret message", {
+        fallbackToDM: true,
+      });
+
+      expect(mockPostEphemeral).toHaveBeenCalledWith(
+        "slack:C123:1234.5678",
+        "U789",
+        "Secret message",
+      );
+    });
+
+    it("should fallback to DM when adapter has no postEphemeral and fallbackToDM is true", async () => {
+      // Ensure no postEphemeral method
+      delete mockAdapter.postEphemeral;
+
+      const result = await thread.postEphemeral("U456", "Secret message", {
+        fallbackToDM: true,
+      });
+
+      // Should open DM
+      expect(mockAdapter.openDM).toHaveBeenCalledWith("U456");
+      // Should post message to DM thread
+      expect(mockAdapter.postMessage).toHaveBeenCalledWith(
+        "slack:DU456:",
+        "Secret message",
+      );
+      // Should return with usedFallback: true
+      expect(result).toEqual({
+        id: "msg-1",
+        threadId: "slack:DU456:",
+        usedFallback: true,
+        raw: {},
+      });
+    });
+
+    it("should return null when adapter has no postEphemeral and fallbackToDM is false", async () => {
+      // Ensure no postEphemeral method
+      delete mockAdapter.postEphemeral;
+
+      const result = await thread.postEphemeral("U456", "Secret message", {
+        fallbackToDM: false,
+      });
+
+      // Should not open DM or post message
+      expect(mockAdapter.openDM).not.toHaveBeenCalled();
+      expect(mockAdapter.postMessage).not.toHaveBeenCalled();
+      // Should return null
+      expect(result).toBeNull();
+    });
+
+    it("should return null when adapter has no postEphemeral or openDM", async () => {
+      // Remove both methods
+      delete mockAdapter.postEphemeral;
+      delete mockAdapter.openDM;
+
+      const result = await thread.postEphemeral("U456", "Secret message", {
+        fallbackToDM: true,
+      });
+
+      // Should return null since no fallback is possible
+      expect(result).toBeNull();
+    });
+
+    // Note: Streaming is prevented at the type level - postEphemeral accepts
+    // AdapterPostableMessage | CardJSXElement which excludes AsyncIterable<string>
+  });
 });
