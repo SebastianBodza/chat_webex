@@ -13,6 +13,7 @@ import type {
   Attachment,
   ChatInstance,
   EmojiValue,
+  EphemeralMessage,
   FetchOptions,
   FetchResult,
   FormattedContent,
@@ -1217,6 +1218,76 @@ export class GoogleChatAdapter implements Adapter<GoogleChatThreadId, unknown> {
       };
     } catch (error) {
       this.handleGoogleChatError(error, "postMessage");
+    }
+  }
+
+  async postEphemeral(
+    threadId: string,
+    userId: string,
+    message: AdapterPostableMessage,
+  ): Promise<EphemeralMessage> {
+    const { spaceName, threadName } = this.decodeThreadId(threadId);
+
+    try {
+      // Check if message contains a card
+      const card = extractCard(message);
+
+      const requestBody: chat_v1.Schema$Message = {
+        // privateMessageViewer makes the message visible only to this user
+        privateMessageViewer: { name: userId },
+        thread: threadName ? { name: threadName } : undefined,
+      };
+
+      if (card) {
+        // Render card as Google Chat Card
+        const cardId = `card-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        const googleCard = cardToGoogleCard(card, {
+          cardId,
+          endpointUrl: this.endpointUrl,
+        });
+
+        requestBody.cardsV2 = [googleCard];
+
+        this.logger.debug("GChat API: spaces.messages.create (ephemeral card)", {
+          spaceName,
+          threadName,
+          userId,
+        });
+      } else {
+        // Regular text message
+        requestBody.text = convertEmojiPlaceholders(
+          this.formatConverter.renderPostable(message),
+          "gchat",
+        );
+
+        this.logger.debug("GChat API: spaces.messages.create (ephemeral)", {
+          spaceName,
+          threadName,
+          userId,
+          textLength: requestBody.text.length,
+        });
+      }
+
+      const response = await this.chatApi.spaces.messages.create({
+        parent: spaceName,
+        messageReplyOption: threadName
+          ? "REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD"
+          : undefined,
+        requestBody,
+      });
+
+      this.logger.debug("GChat API: spaces.messages.create ephemeral response", {
+        messageName: response.data.name,
+      });
+
+      return {
+        id: response.data.name || "",
+        threadId,
+        usedFallback: false,
+        raw: response.data,
+      };
+    } catch (error) {
+      this.handleGoogleChatError(error, "postEphemeral");
     }
   }
 

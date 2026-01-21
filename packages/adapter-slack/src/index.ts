@@ -15,6 +15,7 @@ import type {
   Attachment,
   ChatInstance,
   EmojiValue,
+  EphemeralMessage,
   FetchOptions,
   FetchResult,
   FileUpload,
@@ -896,6 +897,86 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       return {
         id: result.ts as string,
         threadId,
+        raw: result,
+      };
+    } catch (error) {
+      this.handleSlackError(error);
+    }
+  }
+
+  async postEphemeral(
+    threadId: string,
+    userId: string,
+    message: AdapterPostableMessage,
+  ): Promise<EphemeralMessage> {
+    const { channel, threadTs } = this.decodeThreadId(threadId);
+
+    try {
+      // Check if message contains a card
+      const card = extractCard(message);
+
+      if (card) {
+        // Render card as Block Kit
+        const blocks = cardToBlockKit(card);
+        const fallbackText = cardToFallbackText(card);
+
+        this.logger.debug("Slack API: chat.postEphemeral (blocks)", {
+          channel,
+          threadTs,
+          userId,
+          blockCount: blocks.length,
+        });
+
+        const result = await this.client.chat.postEphemeral({
+          channel,
+          thread_ts: threadTs || undefined,
+          user: userId,
+          text: fallbackText,
+          blocks,
+        });
+
+        this.logger.debug("Slack API: chat.postEphemeral response", {
+          messageTs: result.message_ts,
+          ok: result.ok,
+        });
+
+        return {
+          id: result.message_ts || "",
+          threadId,
+          usedFallback: false,
+          raw: result,
+        };
+      }
+
+      // Regular text message
+      const text = convertEmojiPlaceholders(
+        this.formatConverter.renderPostable(message),
+        "slack",
+      );
+
+      this.logger.debug("Slack API: chat.postEphemeral", {
+        channel,
+        threadTs,
+        userId,
+        textLength: text.length,
+      });
+
+      const result = await this.client.chat.postEphemeral({
+        channel,
+        thread_ts: threadTs || undefined,
+        user: userId,
+        text,
+      });
+
+      this.logger.debug("Slack API: chat.postEphemeral response", {
+        messageTs: result.message_ts,
+        ok: result.ok,
+      });
+
+      return {
+        id: result.message_ts || "",
+        threadId,
+        usedFallback: false,
         raw: result,
       };
     } catch (error) {
