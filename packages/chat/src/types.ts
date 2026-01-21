@@ -1215,6 +1215,7 @@ export interface ModalSubmitEvent {
 export interface ModalCloseEvent {
   callbackId: string;
   viewId: string;
+  privateMetadata?: string;
   user: Author;
   adapter: Adapter;
   raw: unknown;
