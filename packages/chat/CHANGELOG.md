@@ -1,5 +1,11 @@
 # chat
 
+## 4.5.0
+
+### Minor Changes
+
+- efa6b36: add postEphemeral() for ephemeral messages
+
 ## 4.4.1
 
 ### Patch Changes
