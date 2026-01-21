@@ -516,6 +516,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     const event = {
       callbackId: payload.view.callback_id,
       viewId: payload.view.id,
+      privateMetadata: payload.view.private_metadata,
       user: {
         userId: payload.user.id,
         userName: payload.user.username || payload.user.name || "unknown",
@@ -530,6 +531,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     this.logger.debug("Processing Slack view closed", {
       callbackId: payload.view.callback_id,
       viewId: payload.view.id,
+      privateMetadata: payload.view.private_metadata,
       user: payload.user.username,
     });
 
