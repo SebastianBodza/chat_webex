@@ -214,7 +214,11 @@ function isJSXElement(value: unknown): value is JSXElement {
 }
 
 /** Non-null card element for children arrays */
-type CardChildOrNested = CardChild | ButtonElement | LinkButtonElement | FieldElement;
+type CardChildOrNested =
+  | CardChild
+  | ButtonElement
+  | LinkButtonElement
+  | FieldElement;
 
 /**
  * Process children, converting JSX elements to card elements.

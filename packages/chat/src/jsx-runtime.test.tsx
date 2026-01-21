@@ -168,9 +168,7 @@ describe("chat-sdk JSX runtime with actual JSX syntax", () => {
             <Button id="submit" style="primary">
               Submit
             </Button>
-            <LinkButton url="https://docs.example.com">
-              View Docs
-            </LinkButton>
+            <LinkButton url="https://docs.example.com">View Docs</LinkButton>
           </Actions>
         </Card>
       );
