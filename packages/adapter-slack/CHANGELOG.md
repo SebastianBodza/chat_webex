@@ -1,5 +1,17 @@
 # @chat-adapter/slack
 
+## 4.5.0
+
+### Minor Changes
+
+- efa6b36: add postEphemeral() for ephemeral messages
+
+### Patch Changes
+
+- Updated dependencies [efa6b36]
+  - chat@4.5.0
+  - @chat-adapter/shared@4.5.0
+
 ## 4.4.1
 
 ### Patch Changes
