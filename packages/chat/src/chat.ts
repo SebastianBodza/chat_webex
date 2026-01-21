@@ -1,3 +1,8 @@
+import {
+  getChatSingleton,
+  hasChatSingleton,
+  setChatSingleton,
+} from "./chat-singleton";
 import { isJSX, toModalElement } from "./jsx-runtime";
 import { Message, type SerializedMessage } from "./message";
 import type { ModalElement } from "./modals";
@@ -110,6 +115,39 @@ export class Chat<
   TState = Record<string, unknown>,
 > implements ChatInstance
 {
+  /**
+   * Register this Chat instance as the global singleton.
+   * Required for Thread deserialization via @workflow/serde.
+   *
+   * @example
+   * ```typescript
+   * const chat = new Chat({ ... });
+   * chat.registerSingleton();
+   *
+   * // Now threads can be deserialized without passing chat explicitly
+   * const thread = ThreadImpl.fromJSON(serializedThread);
+   * ```
+   */
+  registerSingleton(): this {
+    setChatSingleton(this);
+    return this;
+  }
+
+  /**
+   * Get the registered singleton Chat instance.
+   * Throws if no singleton has been registered.
+   */
+  static getSingleton(): Chat {
+    return getChatSingleton() as Chat;
+  }
+
+  /**
+   * Check if a singleton has been registered.
+   */
+  static hasSingleton(): boolean {
+    return hasChatSingleton();
+  }
+
   private adapters: Map<string, Adapter>;
   private _stateAdapter: StateAdapter;
   private userName: string;
@@ -481,13 +519,13 @@ export class Chat<
    * ```
    */
   reviver(): (key: string, value: unknown) => unknown {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const chat = this;
+    // Ensure this chat instance is registered as singleton for thread deserialization
+    this.registerSingleton();
     return function reviver(_key: string, value: unknown): unknown {
       if (value && typeof value === "object" && "_type" in value) {
         const typed = value as { _type: string };
         if (typed._type === "chat:Thread") {
-          return ThreadImpl.fromJSON(chat, value as SerializedThread);
+          return ThreadImpl.fromJSON(value as SerializedThread);
         }
         if (typed._type === "chat:Message") {
           return Message.fromJSON(value as SerializedMessage);

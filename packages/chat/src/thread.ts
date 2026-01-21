@@ -1,7 +1,7 @@
 import { WORKFLOW_DESERIALIZE, WORKFLOW_SERIALIZE } from "@workflow/serde";
 import type { Root } from "mdast";
 import { cardToFallbackText } from "./cards";
-import type { Chat } from "./chat";
+import { getChatSingleton } from "./chat-singleton";
 import { type CardJSXElement, isJSX, toCardElement } from "./jsx-runtime";
 import {
   paragraph,
@@ -34,20 +34,42 @@ export interface SerializedThread {
   adapterName: string;
 }
 
-interface ThreadImplConfig {
+/**
+ * Config for creating a ThreadImpl with explicit adapter/state instances.
+ */
+interface ThreadImplConfigWithAdapter {
   id: string;
   adapter: Adapter;
   channelId: string;
   stateAdapter: StateAdapter;
   initialMessage?: Message;
-  /** If true, thread is known to be subscribed (for short-circuit optimization) */
   isSubscribedContext?: boolean;
-  /** Whether this is a direct message conversation */
   isDM?: boolean;
-  /** Current message context for streaming (provides userId/teamId) */
   currentMessage?: Message;
-  /** Update interval for fallback streaming in milliseconds. Defaults to 500ms. */
   streamingUpdateIntervalMs?: number;
+}
+
+/**
+ * Config for creating a ThreadImpl with lazy adapter resolution.
+ * The adapter will be looked up from the Chat singleton on first access.
+ */
+interface ThreadImplConfigLazy {
+  id: string;
+  adapterName: string;
+  channelId: string;
+  initialMessage?: Message;
+  isSubscribedContext?: boolean;
+  isDM?: boolean;
+  currentMessage?: Message;
+  streamingUpdateIntervalMs?: number;
+}
+
+type ThreadImplConfig = ThreadImplConfigWithAdapter | ThreadImplConfigLazy;
+
+function isLazyConfig(
+  config: ThreadImplConfig,
+): config is ThreadImplConfigLazy {
+  return "adapterName" in config && !("adapter" in config);
 }
 
 /** State key prefix for thread state */
@@ -66,11 +88,15 @@ export class ThreadImpl<TState = Record<string, unknown>>
   implements Thread<TState>
 {
   readonly id: string;
-  readonly adapter: Adapter;
   readonly channelId: string;
   readonly isDM: boolean;
 
-  private _stateAdapter: StateAdapter;
+  /** Direct adapter instance (if provided) */
+  private _adapter?: Adapter;
+  /** Adapter name for lazy resolution */
+  private _adapterName?: string;
+  /** Direct state adapter instance (if provided) */
+  private _stateAdapterInstance?: StateAdapter;
   private _recentMessages: Message[] = [];
   private _isSubscribedContext: boolean;
   /** Current message context for streaming - provides userId/teamId */
@@ -80,17 +106,66 @@ export class ThreadImpl<TState = Record<string, unknown>>
 
   constructor(config: ThreadImplConfig) {
     this.id = config.id;
-    this.adapter = config.adapter;
     this.channelId = config.channelId;
     this.isDM = config.isDM ?? false;
-    this._stateAdapter = config.stateAdapter;
     this._isSubscribedContext = config.isSubscribedContext ?? false;
     this._currentMessage = config.currentMessage;
     this._streamingUpdateIntervalMs = config.streamingUpdateIntervalMs ?? 500;
 
+    if (isLazyConfig(config)) {
+      // Lazy resolution mode - store adapter name for later lookup
+      this._adapterName = config.adapterName;
+    } else {
+      // Direct mode - store adapter and state instances
+      this._adapter = config.adapter;
+      this._stateAdapterInstance = config.stateAdapter;
+    }
+
     if (config.initialMessage) {
       this._recentMessages = [config.initialMessage];
     }
+  }
+
+  /**
+   * Get the adapter for this thread.
+   * If created with lazy config, resolves from Chat singleton on first access.
+   */
+  get adapter(): Adapter {
+    if (this._adapter) {
+      return this._adapter;
+    }
+
+    if (!this._adapterName) {
+      throw new Error("Thread has no adapter configured");
+    }
+
+    // Lazy resolution from singleton
+    const chat = getChatSingleton();
+    const adapter = chat.getAdapter(this._adapterName);
+    if (!adapter) {
+      throw new Error(
+        `Adapter "${this._adapterName}" not found in Chat singleton`,
+      );
+    }
+
+    // Cache for subsequent accesses
+    this._adapter = adapter;
+    return adapter;
+  }
+
+  /**
+   * Get the state adapter for this thread.
+   * If created with lazy config, resolves from Chat singleton on first access.
+   */
+  private get _stateAdapter(): StateAdapter {
+    if (this._stateAdapterInstance) {
+      return this._stateAdapterInstance;
+    }
+
+    // Lazy resolution from singleton
+    const chat = getChatSingleton();
+    this._stateAdapterInstance = chat.getState();
+    return this._stateAdapterInstance;
   }
 
   get recentMessages(): Message[] {
@@ -368,35 +443,25 @@ export class ThreadImpl<TState = Record<string, unknown>>
 
   /**
    * Reconstruct a Thread from serialized JSON data.
-   * Requires the Chat instance to look up the adapter and state.
    *
-   * @param chat - The Chat instance with registered adapters
-   * @param json - The serialized thread data from toJSON()
-   * @returns A new ThreadImpl instance
+   * Reconstructs a ThreadImpl from serialized data.
+   * Uses lazy resolution from Chat.getSingleton() for adapter and state.
+   *
+   * @param json - Serialized thread data
+   * @requires Call `chat.registerSingleton()` before deserializing threads
    *
    * @example
    * ```typescript
-   * // In a workflow handler
-   * const thread = ThreadImpl.fromJSON(chat, data.thread);
-   * await thread.post("Hello from workflow!");
+   * const thread = ThreadImpl.fromJSON(serializedThread);
    * ```
    */
   static fromJSON<TState = Record<string, unknown>>(
-    chat: Chat<Record<string, Adapter>, TState>,
     json: SerializedThread,
   ): ThreadImpl<TState> {
-    const adapter = chat.getAdapter(json.adapterName);
-    if (!adapter) {
-      throw new Error(
-        `Adapter "${json.adapterName}" not found in chat instance`,
-      );
-    }
-
     return new ThreadImpl<TState>({
       id: json.id,
-      adapter,
+      adapterName: json.adapterName,
       channelId: json.channelId,
-      stateAdapter: chat.getState(),
       isDM: json.isDM,
     });
   }
@@ -411,14 +476,11 @@ export class ThreadImpl<TState = Record<string, unknown>>
 
   /**
    * Deserialize a ThreadImpl from @workflow/serde.
-   * Note: This returns the serialized data as-is because deserialization
-   * requires a Chat instance. Use chat.reviver() or ThreadImpl.fromJSON()
-   * with the Chat instance to fully reconstruct the thread.
+   * Uses lazy adapter resolution from Chat.getSingleton().
+   * Requires chat.registerSingleton() to have been called.
    */
-  static [WORKFLOW_DESERIALIZE](data: SerializedThread): SerializedThread {
-    // Return the data as-is - full deserialization requires a Chat instance
-    // The workflow engine should use chat.reviver() to complete deserialization
-    return data;
+  static [WORKFLOW_DESERIALIZE](data: SerializedThread): ThreadImpl {
+    return ThreadImpl.fromJSON(data);
   }
 
   private createSentMessage(

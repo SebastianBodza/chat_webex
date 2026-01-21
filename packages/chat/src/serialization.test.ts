@@ -1,6 +1,7 @@
 import { WORKFLOW_DESERIALIZE, WORKFLOW_SERIALIZE } from "@workflow/serde";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Chat } from "./chat";
+import { clearChatSingleton } from "./chat-singleton";
 import { Message, type SerializedMessage } from "./message";
 import {
   createMockAdapter,
@@ -86,6 +87,12 @@ describe("Serialization", () => {
         state: mockState,
         logger: "silent",
       });
+      // Register singleton for lazy resolution
+      chat.registerSingleton();
+    });
+
+    afterEach(() => {
+      clearChatSingleton();
     });
 
     it("should reconstruct thread from JSON", () => {
@@ -97,7 +104,7 @@ describe("Serialization", () => {
         adapterName: "slack",
       };
 
-      const thread = ThreadImpl.fromJSON(chat, json);
+      const thread = ThreadImpl.fromJSON(json);
 
       expect(thread.id).toBe("slack:C123:1234.5678");
       expect(thread.channelId).toBe("C123");
@@ -114,12 +121,12 @@ describe("Serialization", () => {
         adapterName: "slack",
       };
 
-      const thread = ThreadImpl.fromJSON(chat, json);
+      const thread = ThreadImpl.fromJSON(json);
 
       expect(thread.isDM).toBe(true);
     });
 
-    it("should throw error for unknown adapter", () => {
+    it("should throw error for unknown adapter on access", () => {
       const json: SerializedThread = {
         _type: "chat:Thread",
         id: "discord:channel:thread",
@@ -128,8 +135,10 @@ describe("Serialization", () => {
         adapterName: "discord",
       };
 
-      expect(() => ThreadImpl.fromJSON(chat, json)).toThrow(
-        'Adapter "discord" not found in chat instance',
+      const thread = ThreadImpl.fromJSON(json);
+      // Error is thrown on adapter access, not during fromJSON
+      expect(() => thread.adapter).toThrow(
+        'Adapter "discord" not found in Chat singleton',
       );
     });
 
@@ -145,7 +154,7 @@ describe("Serialization", () => {
       });
 
       const json = original.toJSON();
-      const restored = ThreadImpl.fromJSON(chat, json);
+      const restored = ThreadImpl.fromJSON(json);
 
       expect(restored.id).toBe(original.id);
       expect(restored.channelId).toBe(original.channelId);
@@ -411,6 +420,10 @@ describe("Serialization", () => {
       });
     });
 
+    afterEach(() => {
+      clearChatSingleton();
+    });
+
     it("should revive chat:Thread objects", () => {
       const json: SerializedThread = {
         _type: "chat:Thread",
@@ -545,6 +558,27 @@ describe("Serialization", () => {
   });
 
   describe("@workflow/serde integration", () => {
+    let chat: Chat;
+    let mockState: ReturnType<typeof createMockState>;
+
+    beforeEach(() => {
+      mockState = createMockState();
+      chat = new Chat({
+        userName: "test-bot",
+        adapters: {
+          slack: createMockAdapter("slack"),
+          teams: createMockAdapter("teams"),
+        },
+        state: mockState,
+        logger: "silent",
+      });
+    });
+
+    afterEach(() => {
+      // Clear the singleton between tests
+      clearChatSingleton();
+    });
+
     describe("ThreadImpl", () => {
       it("should have WORKFLOW_SERIALIZE static method", () => {
         expect(ThreadImpl[WORKFLOW_SERIALIZE]).toBeDefined();
@@ -579,7 +613,7 @@ describe("Serialization", () => {
         });
       });
 
-      it("should return serialized data from WORKFLOW_DESERIALIZE", () => {
+      it("should deserialize via WORKFLOW_DESERIALIZE with lazy resolution", () => {
         const data: SerializedThread = {
           _type: "chat:Thread",
           id: "slack:C123:1234.5678",
@@ -588,11 +622,18 @@ describe("Serialization", () => {
           adapterName: "slack",
         };
 
-        // WORKFLOW_DESERIALIZE returns the data as-is because
-        // full deserialization requires a Chat instance
+        // Register the Chat singleton for lazy resolution
+        chat.registerSingleton();
+
+        // WORKFLOW_DESERIALIZE now returns a ThreadImpl with lazy adapter resolution
         const result = ThreadImpl[WORKFLOW_DESERIALIZE](data);
 
-        expect(result).toEqual(data);
+        expect(result).toBeInstanceOf(ThreadImpl);
+        expect(result.id).toBe("slack:C123:1234.5678");
+        expect(result.channelId).toBe("C123");
+        expect(result.isDM).toBe(false);
+        // Adapter is lazily resolved from the singleton
+        expect(result.adapter.name).toBe("slack");
       });
     });
 
