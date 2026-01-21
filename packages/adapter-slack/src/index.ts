@@ -21,7 +21,6 @@ import type {
   FileUpload,
   FormattedContent,
   Logger,
-  Message,
   ModalElement,
   ModalResponse,
   RawMessage,
@@ -35,6 +34,7 @@ import {
   ChatError,
   convertEmojiPlaceholders,
   defaultEmojiResolver,
+  Message,
 } from "chat";
 import { cardToBlockKit, cardToFallbackText } from "./cards";
 import { SlackFormatConverter } from "./markdown";
@@ -517,6 +517,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     const event = {
       callbackId: payload.view.callback_id,
       viewId: payload.view.id,
+      privateMetadata: payload.view.private_metadata,
       user: {
         userId: payload.user.id,
         userName: payload.user.username || payload.user.name || "unknown",
@@ -531,6 +532,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     this.logger.debug("Processing Slack view closed", {
       callbackId: payload.view.callback_id,
       viewId: payload.view.id,
+      privateMetadata: payload.view.private_metadata,
       user: payload.user.username,
     });
 
@@ -721,7 +723,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       fullName = userInfo.realName;
     }
 
-    return {
+    return new Message({
       id: event.ts || "",
       threadId,
       text: this.formatConverter.extractPlainText(text),
@@ -744,7 +746,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       attachments: (event.files || []).map((file) =>
         this.createAttachment(file),
       ),
-    };
+    });
   }
 
   /**
@@ -1568,7 +1570,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     const userName = event.username || event.user || "unknown";
     const fullName = event.username || event.user || "unknown";
 
-    return {
+    return new Message({
       id: event.ts || "",
       threadId,
       text: this.formatConverter.extractPlainText(text),
@@ -1591,7 +1593,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       attachments: (event.files || []).map((file) =>
         this.createAttachment(file),
       ),
-    };
+    });
   }
 
   renderFormatted(content: FormattedContent): string {

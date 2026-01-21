@@ -384,10 +384,18 @@ import type { ModalCloseEvent } from "chat";
 
 bot.onModalClose("feedback_form", async (event: ModalCloseEvent) => {
   console.log(`${event.user.userName} cancelled the feedback form`);
+
+  // Post a follow-up to the original thread
+  if (event.privateMetadata) {
+    await event.adapter.postMessage(
+      event.privateMetadata,
+      "No worries, let us know if you change your mind!"
+    );
+  }
 });
 ```
 
-The `ModalSubmitEvent` includes `callbackId`, `viewId`, `values`, `privateMetadata`, `user`, `adapter`, and `raw` properties.
+The `ModalSubmitEvent` includes `callbackId`, `viewId`, `values`, `privateMetadata`, `user`, `adapter`, and `raw` properties. The `ModalCloseEvent` includes the same properties except `values`.
 
 ## AI Integration & Streaming
 
