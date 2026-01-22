@@ -168,18 +168,6 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
   /** Fetch thread metadata */
   fetchThread(threadId: string): Promise<ThreadInfo>;
 
-  /**
-   * Fetch a single message by ID.
-   *
-   * @param threadId - The thread containing the message
-   * @param messageId - The platform-specific message ID
-   * @returns The message, or null if not found
-   */
-  fetchMessage?(
-    threadId: string,
-    messageId: string,
-  ): Promise<Message<TRawMessage> | null>;
-
   /** Encode platform-specific data into a thread ID string */
   encodeThreadId(platformData: TThreadId): string;
 
@@ -601,16 +589,6 @@ export interface Thread<
    * Fetches the latest 50 messages and updates `recentMessages`.
    */
   refresh(): Promise<void>;
-
-  /**
-   * Fetch a single message by ID from this thread.
-   *
-   * Returns a SentMessage with edit/delete capabilities if the message exists.
-   *
-   * @param messageId - Platform-specific message ID
-   * @returns SentMessage if found, null otherwise
-   */
-  fetchMessage(messageId: string): Promise<SentMessage<TRawMessage> | null>;
 
   /**
    * Wrap a Message object as a SentMessage with edit/delete capabilities.

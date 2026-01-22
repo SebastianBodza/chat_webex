@@ -1513,38 +1513,6 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     }
   }
 
-  async fetchMessage(
-    threadId: string,
-    messageId: string,
-  ): Promise<Message<unknown> | null> {
-    const { channel, threadTs } = this.decodeThreadId(threadId);
-
-    try {
-      const result = await this.client.conversations.replies({
-        channel,
-        ts: threadTs,
-        oldest: messageId,
-        inclusive: true,
-        limit: 1,
-      });
-
-      const messages = (result.messages || []) as SlackEvent[];
-      const target = messages.find((msg) => msg.ts === messageId);
-      if (!target) return null;
-
-      return await this.parseSlackMessage(target, threadId);
-    } catch (error) {
-      const slackError = error as { data?: { error?: string } };
-      if (
-        slackError.data?.error === "message_not_found" ||
-        slackError.data?.error === "thread_not_found"
-      ) {
-        return null;
-      }
-      this.handleSlackError(error);
-    }
-  }
-
   encodeThreadId(platformData: SlackThreadId): string {
     return `slack:${platformData.channel}:${platformData.threadTs}`;
   }

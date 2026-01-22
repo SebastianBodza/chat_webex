@@ -464,16 +464,6 @@ export class ThreadImpl<TState = Record<string, unknown>>
     this._recentMessages = result.messages;
   }
 
-  async fetchMessage(messageId: string): Promise<SentMessage | null> {
-    if (!this.adapter.fetchMessage) {
-      throw new Error(
-        `Adapter ${this.adapter.name} does not support fetchMessage()`,
-      );
-    }
-    const message = await this.adapter.fetchMessage(this.id, messageId);
-    return message ? this.createSentMessageFromMessage(message) : null;
-  }
-
   mentionUser(userId: string): string {
     return `<@${userId}>`;
   }
