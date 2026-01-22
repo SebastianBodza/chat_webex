@@ -801,15 +801,26 @@ describe("Chat", () => {
       };
       const result = await capturedEvent?.openModal(modal);
 
+      // openModal should be called with triggerId, modal, and a contextId string
       expect(mockAdapter.openModal).toHaveBeenCalledWith(
         "trigger-123",
         modal,
-        expect.objectContaining({
-          threadId: "slack:C123:1234.5678",
-          messageId: "msg-1",
-        }),
+        expect.any(String), // contextId (UUID)
       );
       expect(result).toEqual({ viewId: "V123" });
+
+      // Verify context was stored in state (contextId is a UUID)
+      const calls = (mockState.set as ReturnType<typeof vi.fn>).mock.calls;
+      const modalContextCall = calls.find((c: unknown[]) =>
+        (c[0] as string).startsWith("modal-context:"),
+      );
+      expect(modalContextCall).toBeDefined();
+      expect(modalContextCall?.[1]).toMatchObject({
+        thread: expect.objectContaining({
+          _type: "chat:Thread",
+          id: "slack:C123:1234.5678",
+        }),
+      });
     });
 
     it("should convert JSX Modal to ModalElement in openModal", async () => {
@@ -847,6 +858,7 @@ describe("Chat", () => {
       const result = await capturedEvent?.openModal(jsxModal);
 
       // Should have converted JSX to ModalElement before calling adapter
+      // openModal should be called with triggerId, modal, and a contextId string
       expect(mockAdapter.openModal).toHaveBeenCalledWith(
         "trigger-123",
         expect.objectContaining({
@@ -854,10 +866,7 @@ describe("Chat", () => {
           callbackId: "jsx_modal",
           title: "JSX Modal",
         }),
-        expect.objectContaining({
-          threadId: "slack:C123:1234.5678",
-          messageId: "msg-1",
-        }),
+        expect.any(String), // contextId (UUID)
       );
       expect(result).toEqual({ viewId: "V123" });
     });

@@ -29,13 +29,11 @@ describe("Modal Elements", () => {
         submitLabel: "Submit",
         closeLabel: "Cancel",
         notifyOnClose: true,
-        privateMetadata: "some-data",
       });
 
       expect(modal.submitLabel).toBe("Submit");
       expect(modal.closeLabel).toBe("Cancel");
       expect(modal.notifyOnClose).toBe(true);
-      expect(modal.privateMetadata).toBe("some-data");
     });
   });
 

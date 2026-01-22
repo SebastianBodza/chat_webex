@@ -295,7 +295,6 @@ bot.onAction("feedback", async (event) => {
       submitLabel="Send"
       closeLabel="Cancel"
       notifyOnClose
-      privateMetadata="optional-custom-data" // Optional: your own custom data
     >
       <TextInput
         id="message"
@@ -323,7 +322,7 @@ bot.onAction("feedback", async (event) => {
 
 | Component      | Description                                                                                           |
 | -------------- | ----------------------------------------------------------------------------------------------------- |
-| `Modal`        | Container with `callbackId`, `title`, `submitLabel`, `closeLabel`, `notifyOnClose`, `privateMetadata` |
+| `Modal`        | Container with `callbackId`, `title`, `submitLabel`, `closeLabel`, `notifyOnClose` |
 | `TextInput`    | Text field with `id`, `label`, `placeholder`, `initialValue`, `multiline`, `optional`, `maxLength`    |
 | `Select`       | Dropdown with `id`, `label`, `placeholder`, `initialOption`, `optional`                               |
 | `SelectOption` | Option for Select with `label` and `value`                                                            |
@@ -392,7 +391,7 @@ bot.onModalClose("feedback_form", async (event: ModalCloseEvent) => {
 });
 ```
 
-The `ModalSubmitEvent` includes `callbackId`, `viewId`, `values`, `privateMetadata`, `user`, `adapter`, `relatedThread`, `relatedMessage`, and `raw` properties. The `ModalCloseEvent` includes the same properties except `values`.
+The `ModalSubmitEvent` includes `callbackId`, `viewId`, `values`, `user`, `adapter`, `relatedThread`, `relatedMessage`, and `raw` properties. The `ModalCloseEvent` includes the same properties except `values`.
 
 ## AI Integration & Streaming
 

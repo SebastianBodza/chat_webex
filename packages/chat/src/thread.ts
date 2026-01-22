@@ -615,7 +615,7 @@ export class ThreadImpl<TState = Record<string, unknown>>
     return sentMessage;
   }
 
-  private createSentMessageFromMessage(message: Message): SentMessage {
+  createSentMessageFromMessage(message: Message): SentMessage {
     const adapter = this.adapter;
     const threadId = this.id;
     const messageId = message.id;

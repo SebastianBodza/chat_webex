@@ -243,13 +243,13 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
    *
    * @param triggerId - Platform-specific trigger ID from the action event
    * @param modal - The modal element to display
-   * @param context - Optional context about the originating thread/message (for reconstructing relatedThread/relatedMessage on submit)
+   * @param contextId - Optional context ID for server-side stored thread/message context
    * @returns The view/dialog ID
    */
   openModal?(
     triggerId: string,
     modal: ModalElement,
-    context?: ModalOpenContext,
+    contextId?: string,
   ): Promise<{ viewId: string }>;
 
   /**
@@ -338,12 +338,12 @@ export interface ChatInstance {
    * Process a modal submit event from an adapter.
    *
    * @param event - The modal submit event (without relatedThread/relatedMessage)
-   * @param context - Decoded context from the adapter (optional). If provided, used to reconstruct relatedThread/relatedMessage.
+   * @param contextId - Context ID for retrieving stored thread/message context
    * @param options - Webhook options
    */
   processModalSubmit(
     event: Omit<ModalSubmitEvent, "relatedThread" | "relatedMessage">,
-    context?: DecodedModalContext,
+    contextId?: string,
     options?: WebhookOptions,
   ): Promise<ModalResponse | undefined>;
 
@@ -351,12 +351,12 @@ export interface ChatInstance {
    * Process a modal close event from an adapter.
    *
    * @param event - The modal close event (without relatedThread/relatedMessage)
-   * @param context - Decoded context from the adapter (optional). If provided, used to reconstruct relatedThread/relatedMessage.
+   * @param contextId - Context ID for retrieving stored thread/message context
    * @param options - Webhook options
    */
   processModalClose(
     event: Omit<ModalCloseEvent, "relatedThread" | "relatedMessage">,
-    context?: DecodedModalContext,
+    contextId?: string,
     options?: WebhookOptions,
   ): void;
 
@@ -611,6 +611,14 @@ export interface Thread<
    * @returns SentMessage if found, null otherwise
    */
   fetchMessage(messageId: string): Promise<SentMessage<TRawMessage> | null>;
+
+  /**
+   * Wrap a Message object as a SentMessage with edit/delete capabilities.
+   * Used internally for reconstructing messages from serialized data.
+   */
+  createSentMessageFromMessage(
+    message: Message<TRawMessage>,
+  ): SentMessage<TRawMessage>;
 
   /**
    * Get a platform-specific mention string for a user.
@@ -1286,32 +1294,6 @@ export type ActionHandler = (event: ActionEvent) => Promise<void>;
 // =============================================================================
 
 /**
- * Context passed to adapter.openModal() for reconstructing related thread/message on submit.
- * This is an internal type - adapters use platform-specific mechanisms to store this context.
- */
-export interface ModalOpenContext {
-  /** The thread ID where the modal was opened from */
-  threadId: string;
-  /** The message ID that triggered the modal (if from a message action) */
-  messageId?: string;
-  /** User's custom privateMetadata from the Modal element */
-  userMetadata?: string;
-}
-
-/**
- * Decoded modal context returned by adapters after decoding platform-specific metadata.
- * Adapters decode their platform-specific storage format and return this structure.
- */
-export interface DecodedModalContext {
-  /** The thread ID where the modal was opened from */
-  threadId: string;
-  /** The message ID that triggered the modal (if from a message action) */
-  messageId?: string;
-  /** User's custom privateMetadata from the Modal element */
-  privateMetadata?: string;
-}
-
-/**
  * Event emitted when a user submits a modal form.
  */
 export interface ModalSubmitEvent<TRawMessage = unknown> {
@@ -1321,8 +1303,6 @@ export interface ModalSubmitEvent<TRawMessage = unknown> {
   viewId: string;
   /** Form field values keyed by input ID */
   values: Record<string, string>;
-  /** User's custom privateMetadata (passed through from Modal element) */
-  privateMetadata?: string;
   /** The user who submitted the modal */
   user: Author;
   /** The adapter that received this event */
@@ -1350,8 +1330,6 @@ export interface ModalCloseEvent<TRawMessage = unknown> {
   callbackId: string;
   /** Platform-specific view/dialog ID */
   viewId: string;
-  /** User's custom privateMetadata (passed through from Modal element) */
-  privateMetadata?: string;
   /** The user who closed the modal */
   user: Author;
   /** The adapter that received this event */
