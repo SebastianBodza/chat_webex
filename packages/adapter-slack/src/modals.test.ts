@@ -212,17 +212,28 @@ describe("modalToSlackView", () => {
     });
   });
 
-  it("includes private metadata when provided", () => {
+  it("includes contextId as private_metadata when provided", () => {
     const modal = Modal({
       callbackId: "test",
       title: "Test",
-      privateMetadata: "some-context-data",
+      children: [],
+    });
+
+    const view = modalToSlackView(modal, "context-uuid-123");
+
+    expect(view.private_metadata).toBe("context-uuid-123");
+  });
+
+  it("private_metadata is undefined when no contextId provided", () => {
+    const modal = Modal({
+      callbackId: "test",
+      title: "Test",
       children: [],
     });
 
     const view = modalToSlackView(modal);
 
-    expect(view.private_metadata).toBe("some-context-data");
+    expect(view.private_metadata).toBeUndefined();
   });
 
   it("sets notify_on_close when provided", () => {
@@ -257,7 +268,6 @@ describe("modalToSlackView", () => {
       submitLabel: "Send",
       closeLabel: "Cancel",
       notifyOnClose: true,
-      privateMetadata: "thread:123",
       children: [
         TextInput({
           id: "message",
@@ -282,9 +292,10 @@ describe("modalToSlackView", () => {
       ],
     });
 
-    const view = modalToSlackView(modal);
+    const view = modalToSlackView(modal, "thread-context-123");
 
     expect(view.callback_id).toBe("feedback_form");
+    expect(view.private_metadata).toBe("thread-context-123");
     expect(view.blocks).toHaveLength(3);
     expect(view.blocks[0].type).toBe("input");
     expect(view.blocks[1].type).toBe("input");

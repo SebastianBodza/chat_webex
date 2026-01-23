@@ -231,11 +231,13 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
    *
    * @param triggerId - Platform-specific trigger ID from the action event
    * @param modal - The modal element to display
+   * @param contextId - Optional context ID for server-side stored thread/message context
    * @returns The view/dialog ID
    */
   openModal?(
     triggerId: string,
     modal: ModalElement,
+    contextId?: string,
   ): Promise<{ viewId: string }>;
 
   /**
@@ -320,13 +322,29 @@ export interface ChatInstance {
     options?: WebhookOptions,
   ): void;
 
+  /**
+   * Process a modal submit event from an adapter.
+   *
+   * @param event - The modal submit event (without relatedThread/relatedMessage)
+   * @param contextId - Context ID for retrieving stored thread/message context
+   * @param options - Webhook options
+   */
   processModalSubmit(
-    event: Omit<ModalSubmitEvent, "thread">,
+    event: Omit<ModalSubmitEvent, "relatedThread" | "relatedMessage">,
+    contextId?: string,
     options?: WebhookOptions,
   ): Promise<ModalResponse | undefined>;
 
+  /**
+   * Process a modal close event from an adapter.
+   *
+   * @param event - The modal close event (without relatedThread/relatedMessage)
+   * @param contextId - Context ID for retrieving stored thread/message context
+   * @param options - Webhook options
+   */
   processModalClose(
-    event: Omit<ModalCloseEvent, "thread">,
+    event: Omit<ModalCloseEvent, "relatedThread" | "relatedMessage">,
+    contextId?: string,
     options?: WebhookOptions,
   ): void;
 
@@ -571,6 +589,14 @@ export interface Thread<
    * Fetches the latest 50 messages and updates `recentMessages`.
    */
   refresh(): Promise<void>;
+
+  /**
+   * Wrap a Message object as a SentMessage with edit/delete capabilities.
+   * Used internally for reconstructing messages from serialized data.
+   */
+  createSentMessageFromMessage(
+    message: Message<TRawMessage>,
+  ): SentMessage<TRawMessage>;
 
   /**
    * Get a platform-specific mention string for a user.
@@ -1245,23 +1271,60 @@ export type ActionHandler = (event: ActionEvent) => Promise<void>;
 // Modal Events (Form Submissions)
 // =============================================================================
 
-export interface ModalSubmitEvent {
+/**
+ * Event emitted when a user submits a modal form.
+ */
+export interface ModalSubmitEvent<TRawMessage = unknown> {
+  /** The callback ID specified when creating the modal */
   callbackId: string;
+  /** Platform-specific view/dialog ID */
   viewId: string;
+  /** Form field values keyed by input ID */
   values: Record<string, string>;
-  privateMetadata?: string;
+  /** The user who submitted the modal */
   user: Author;
+  /** The adapter that received this event */
   adapter: Adapter;
+  /** Raw platform-specific payload */
   raw: unknown;
+  /**
+   * The thread where the modal was originally triggered from.
+   * Available when the modal was opened via ActionEvent.openModal().
+   */
+  relatedThread?: Thread<Record<string, unknown>, TRawMessage>;
+  /**
+   * The message that contained the action which opened the modal.
+   * Available when the modal was opened from a message action via ActionEvent.openModal().
+   * This is a SentMessage with edit/delete capabilities.
+   */
+  relatedMessage?: SentMessage<TRawMessage>;
 }
 
-export interface ModalCloseEvent {
+/**
+ * Event emitted when a user closes/cancels a modal (requires notifyOnClose).
+ */
+export interface ModalCloseEvent<TRawMessage = unknown> {
+  /** The callback ID specified when creating the modal */
   callbackId: string;
+  /** Platform-specific view/dialog ID */
   viewId: string;
-  privateMetadata?: string;
+  /** The user who closed the modal */
   user: Author;
+  /** The adapter that received this event */
   adapter: Adapter;
+  /** Raw platform-specific payload */
   raw: unknown;
+  /**
+   * The thread where the modal was originally triggered from.
+   * Available when the modal was opened via ActionEvent.openModal().
+   */
+  relatedThread?: Thread<Record<string, unknown>, TRawMessage>;
+  /**
+   * The message that contained the action which opened the modal.
+   * Available when the modal was opened from a message action via ActionEvent.openModal().
+   * This is a SentMessage with edit/delete capabilities.
+   */
+  relatedMessage?: SentMessage<TRawMessage>;
 }
 
 export type ModalErrorsResponse = {

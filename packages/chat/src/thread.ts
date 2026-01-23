@@ -507,13 +507,18 @@ export class ThreadImpl<TState = Record<string, unknown>>
    */
   static fromJSON<TState = Record<string, unknown>>(
     json: SerializedThread,
+    adapter?: Adapter,
   ): ThreadImpl<TState> {
-    return new ThreadImpl<TState>({
+    const thread = new ThreadImpl<TState>({
       id: json.id,
       adapterName: json.adapterName,
       channelId: json.channelId,
       isDM: json.isDM,
     });
+    if (adapter) {
+      thread._adapter = adapter;
+    }
+    return thread;
   }
 
   /**
@@ -603,6 +608,57 @@ export class ThreadImpl<TState = Record<string, unknown>>
     };
 
     return sentMessage;
+  }
+
+  createSentMessageFromMessage(message: Message): SentMessage {
+    const adapter = this.adapter;
+    const threadId = this.id;
+    const messageId = message.id;
+    const self = this;
+
+    return {
+      id: message.id,
+      threadId: message.threadId,
+      text: message.text,
+      formatted: message.formatted,
+      raw: message.raw,
+      author: message.author,
+      metadata: message.metadata,
+      attachments: message.attachments,
+      isMention: message.isMention,
+
+      toJSON() {
+        return message.toJSON();
+      },
+
+      async edit(
+        newContent: string | PostableMessage | CardJSXElement,
+      ): Promise<SentMessage> {
+        let postable: string | AdapterPostableMessage = newContent as
+          | string
+          | AdapterPostableMessage;
+        if (isJSX(newContent)) {
+          const card = toCardElement(newContent);
+          if (!card)
+            throw new Error("Invalid JSX element: must be a Card element");
+          postable = card;
+        }
+        await adapter.editMessage(threadId, messageId, postable);
+        return self.createSentMessage(messageId, postable, threadId);
+      },
+
+      async delete(): Promise<void> {
+        await adapter.deleteMessage(threadId, messageId);
+      },
+
+      async addReaction(emoji: string): Promise<void> {
+        await adapter.addReaction(threadId, messageId, emoji);
+      },
+
+      async removeReaction(emoji: string): Promise<void> {
+        await adapter.removeReaction(threadId, messageId, emoji);
+      },
+    };
   }
 }
 

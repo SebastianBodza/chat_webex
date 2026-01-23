@@ -570,13 +570,11 @@ describe("toModalElement", () => {
       submitLabel: "Send",
       closeLabel: "Cancel",
       notifyOnClose: true,
-      privateMetadata: "some-data",
     });
     const modal = toModalElement(jsxElement);
 
     expect(modal?.submitLabel).toBe("Send");
     expect(modal?.closeLabel).toBe("Cancel");
     expect(modal?.notifyOnClose).toBe(true);
-    expect(modal?.privateMetadata).toBe("some-data");
   });
 });

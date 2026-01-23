@@ -470,11 +470,13 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       }
     }
 
+    // The contextId is stored in private_metadata
+    const contextId = payload.view.private_metadata || undefined;
+
     const event = {
       callbackId: payload.view.callback_id,
       viewId: payload.view.id,
       values,
-      privateMetadata: payload.view.private_metadata,
       user: {
         userId: payload.user.id,
         userName: payload.user.username || payload.user.name || "unknown",
@@ -486,13 +488,11 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       raw: payload,
     };
 
-    this.logger.debug("Processing Slack view submission", {
-      callbackId: payload.view.callback_id,
-      viewId: payload.view.id,
-      user: payload.user.username,
-    });
-
-    const response = await this.chat.processModalSubmit(event, options);
+    const response = await this.chat.processModalSubmit(
+      event,
+      contextId,
+      options,
+    );
 
     if (response) {
       const slackResponse = this.modalResponseToSlack(response);
@@ -514,10 +514,12 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       return;
     }
 
+    // The contextId is stored in private_metadata
+    const contextId = payload.view.private_metadata || undefined;
+
     const event = {
       callbackId: payload.view.callback_id,
       viewId: payload.view.id,
-      privateMetadata: payload.view.private_metadata,
       user: {
         userId: payload.user.id,
         userName: payload.user.username || payload.user.name || "unknown",
@@ -529,14 +531,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       raw: payload,
     };
 
-    this.logger.debug("Processing Slack view closed", {
-      callbackId: payload.view.callback_id,
-      viewId: payload.view.id,
-      privateMetadata: payload.view.private_metadata,
-      user: payload.user.username,
-    });
-
-    this.chat.processModalClose(event, options);
+    this.chat.processModalClose(event, contextId, options);
   }
 
   private modalResponseToSlack(response: ModalResponse): SlackModalResponse {
@@ -987,8 +982,9 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
   async openModal(
     triggerId: string,
     modal: ModalElement,
+    contextId?: string,
   ): Promise<{ viewId: string }> {
-    const view = modalToSlackView(modal);
+    const view = modalToSlackView(modal, contextId);
 
     this.logger.debug("Slack API: views.open", {
       triggerId,

@@ -28,7 +28,10 @@ export interface SlackModalResponse {
   view?: SlackView;
 }
 
-export function modalToSlackView(modal: ModalElement): SlackView {
+export function modalToSlackView(
+  modal: ModalElement,
+  contextId?: string,
+): SlackView {
   return {
     type: "modal",
     callback_id: modal.callbackId,
@@ -40,7 +43,7 @@ export function modalToSlackView(modal: ModalElement): SlackView {
       ? { type: "plain_text", text: modal.closeLabel }
       : { type: "plain_text", text: "Cancel" },
     notify_on_close: modal.notifyOnClose,
-    private_metadata: modal.privateMetadata,
+    private_metadata: contextId,
     blocks: modal.children.map(modalChildToBlock),
   };
 }

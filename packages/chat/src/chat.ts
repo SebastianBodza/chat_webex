@@ -26,6 +26,7 @@ import type {
   ModalSubmitHandler,
   ReactionEvent,
   ReactionHandler,
+  SentMessage,
   StateAdapter,
   SubscribedMessageHandler,
   Thread,
@@ -36,6 +37,13 @@ import { ChatError, ConsoleLogger, LockError } from "./types";
 const DEFAULT_LOCK_TTL_MS = 30_000; // 30 seconds
 /** TTL for message deduplication entries */
 const DEDUPE_TTL_MS = 60_000; // 60 seconds
+const MODAL_CONTEXT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/** Server-side stored modal context */
+interface StoredModalContext {
+  thread: SerializedThread;
+  message?: SerializedMessage;
+}
 
 interface MessagePattern<TState = Record<string, unknown>> {
   pattern: RegExp;
@@ -606,24 +614,26 @@ export class Chat<
   }
 
   async processModalSubmit(
-    event: Omit<ModalSubmitEvent, "thread">,
+    event: Omit<ModalSubmitEvent, "relatedThread" | "relatedMessage">,
+    contextId?: string,
     _options?: WebhookOptions,
   ): Promise<ModalResponse | undefined> {
-    this.logger.debug("Incoming modal submit", {
-      adapter: event.adapter.name,
-      callbackId: event.callbackId,
-      viewId: event.viewId,
-      user: event.user.userName,
-    });
+    const { relatedThread, relatedMessage } = await this.retrieveModalContext(
+      event.adapter.name,
+      contextId,
+    );
 
-    // Run matching handlers, return first response
+    const fullEvent: ModalSubmitEvent = {
+      ...event,
+      relatedThread,
+      relatedMessage,
+    };
+
     for (const { callbackIds, handler } of this.modalSubmitHandlers) {
       if (callbackIds.length === 0 || callbackIds.includes(event.callbackId)) {
         try {
-          const response = await handler(event as ModalSubmitEvent);
-          if (response) {
-            return response;
-          }
+          const response = await handler(fullEvent);
+          if (response) return response;
         } catch (err) {
           this.logger.error("Modal submit handler error", {
             error: err,
@@ -635,23 +645,28 @@ export class Chat<
   }
 
   processModalClose(
-    event: Omit<ModalCloseEvent, "thread">,
+    event: Omit<ModalCloseEvent, "relatedThread" | "relatedMessage">,
+    contextId?: string,
     options?: WebhookOptions,
   ): void {
     const task = (async () => {
-      this.logger.debug("Incoming modal close", {
-        adapter: event.adapter.name,
-        callbackId: event.callbackId,
-        viewId: event.viewId,
-        user: event.user.userName,
-      });
+      const { relatedThread, relatedMessage } = await this.retrieveModalContext(
+        event.adapter.name,
+        contextId,
+      );
+
+      const fullEvent: ModalCloseEvent = {
+        ...event,
+        relatedThread,
+        relatedMessage,
+      };
 
       for (const { callbackIds, handler } of this.modalCloseHandlers) {
         if (
           callbackIds.length === 0 ||
           callbackIds.includes(event.callbackId)
         ) {
-          await handler(event as ModalCloseEvent);
+          await handler(fullEvent);
         }
       }
     })().catch((err) => {
@@ -664,6 +679,64 @@ export class Chat<
     if (options?.waitUntil) {
       options.waitUntil(task);
     }
+  }
+
+  /**
+   * Store modal context server-side and return a context ID.
+   * Called when opening a modal to preserve thread/message for the submit handler.
+   */
+  private async storeModalContext(
+    adapterName: string,
+    thread: ThreadImpl<TState>,
+    message?: Message,
+  ): Promise<string> {
+    const contextId = crypto.randomUUID();
+    const key = `modal-context:${adapterName}:${contextId}`;
+    const context: StoredModalContext = {
+      thread: thread.toJSON(),
+      message: message?.toJSON(),
+    };
+    await this._stateAdapter.set(key, context, MODAL_CONTEXT_TTL_MS);
+    return contextId;
+  }
+
+  /**
+   * Retrieve and delete modal context from server-side storage.
+   * Called when processing modal submit/close to reconstruct thread/message.
+   */
+  private async retrieveModalContext(
+    adapterName: string,
+    contextId?: string,
+  ): Promise<{
+    relatedThread: Thread | undefined;
+    relatedMessage: SentMessage | undefined;
+  }> {
+    if (!contextId) {
+      return { relatedThread: undefined, relatedMessage: undefined };
+    }
+
+    const key = `modal-context:${adapterName}:${contextId}`;
+    const stored = await this._stateAdapter.get<StoredModalContext>(key);
+
+    if (!stored) {
+      return { relatedThread: undefined, relatedMessage: undefined };
+    }
+
+    // Delete after retrieval (one-time use)
+    await this._stateAdapter.delete(key);
+
+    // Reconstruct thread with adapter directly
+    const adapter = this.adapters.get(adapterName);
+    const thread = ThreadImpl.fromJSON(stored.thread, adapter);
+
+    // Reconstruct message if present
+    let relatedMessage: SentMessage | undefined;
+    if (stored.message) {
+      const message = Message.fromJSON(stored.message);
+      relatedMessage = thread.createSentMessageFromMessage(message);
+    }
+
+    return { relatedThread: thread as Thread, relatedMessage };
   }
 
   /**
@@ -724,7 +797,23 @@ export class Chat<
           modalElement = converted;
         }
 
-        return event.adapter.openModal(event.triggerId, modalElement);
+        // Store context server-side and pass contextId to adapter
+        // Only pass message if it's a proper Message object (has toJSON method)
+        const recentMessage = thread.recentMessages[0];
+        const message =
+          recentMessage && typeof recentMessage.toJSON === "function"
+            ? recentMessage
+            : undefined;
+        const contextId = await this.storeModalContext(
+          event.adapter.name,
+          thread as ThreadImpl<TState>,
+          message,
+        );
+        return event.adapter.openModal(
+          event.triggerId,
+          modalElement,
+          contextId,
+        );
       },
     };
 

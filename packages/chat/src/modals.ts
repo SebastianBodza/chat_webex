@@ -15,7 +15,6 @@ export interface ModalElement {
   submitLabel?: string;
   closeLabel?: string;
   notifyOnClose?: boolean;
-  privateMetadata?: string;
   children: ModalChild[];
 }
 
@@ -64,7 +63,6 @@ export interface ModalOptions {
   submitLabel?: string;
   closeLabel?: string;
   notifyOnClose?: boolean;
-  privateMetadata?: string;
   children?: ModalChild[];
 }
 
@@ -76,7 +74,6 @@ export function Modal(options: ModalOptions): ModalElement {
     submitLabel: options.submitLabel,
     closeLabel: options.closeLabel,
     notifyOnClose: options.notifyOnClose,
-    privateMetadata: options.privateMetadata,
     children: options.children ?? [],
   };
 }
@@ -204,7 +201,6 @@ export function fromReactModalElement(
         submitLabel: props.submitLabel as string | undefined,
         closeLabel: props.closeLabel as string | undefined,
         notifyOnClose: props.notifyOnClose as boolean | undefined,
-        privateMetadata: props.privateMetadata as string | undefined,
         children: convertedChildren.filter(
           (c): c is ModalChild =>
             c !== null &&
