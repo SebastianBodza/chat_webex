@@ -725,8 +725,9 @@ export class Chat<
     // Delete after retrieval (one-time use)
     await this._stateAdapter.delete(key);
 
-    // Reconstruct thread (uses lazy resolution from singleton)
-    const thread = ThreadImpl.fromJSON(stored.thread);
+    // Reconstruct thread with adapter directly
+    const adapter = this.adapters.get(adapterName);
+    const thread = ThreadImpl.fromJSON(stored.thread, adapter);
 
     // Reconstruct message if present
     let relatedMessage: SentMessage | undefined;

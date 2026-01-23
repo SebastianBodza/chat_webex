@@ -507,13 +507,18 @@ export class ThreadImpl<TState = Record<string, unknown>>
    */
   static fromJSON<TState = Record<string, unknown>>(
     json: SerializedThread,
+    adapter?: Adapter,
   ): ThreadImpl<TState> {
-    return new ThreadImpl<TState>({
+    const thread = new ThreadImpl<TState>({
       id: json.id,
       adapterName: json.adapterName,
       channelId: json.channelId,
       isDM: json.isDM,
     });
+    if (adapter) {
+      thread._adapter = adapter;
+    }
+    return thread;
   }
 
   /**
