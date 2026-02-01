@@ -93,12 +93,28 @@ Better rate limits, security, and supports multiple installations.
 4. Subscribe to **events**:
    - Issue comment
    - Pull request review comment
-5. Create the app and generate a **private key**
+5. Under "Where can this GitHub App be installed?":
+   - **Only on this account** - For private/testing apps
+   - **Any account** - For public apps others can install
+6. Click **"Create GitHub App"**
+7. Note your **App ID** from the app settings page (shown at the top)
+8. Scroll down and click **"Generate a private key"** - save the downloaded `.pem` file
 
 #### 2. Install the App
 
-1. Install the app on your organization or repositories
-2. Note the **Installation ID** from the URL (e.g., `https://github.com/settings/installations/12345678`)
+1. After creating the app, go to your app's settings page
+2. Click **"Install App"** in the left sidebar
+3. Click **"Install"** next to your organization or account
+4. Choose which repositories to grant access:
+   - **All repositories** - App can access all current and future repos
+   - **Only select repositories** - Pick specific repos (recommended for testing)
+5. Click **"Install"**
+6. Note the **Installation ID** from the URL after installation:
+   ```
+   https://github.com/settings/installations/12345678
+                                              ^^^^^^^^
+                                              This is your Installation ID
+   ```
 
 #### 3. Configure the Adapter
 
