@@ -16,7 +16,7 @@ import type {
   ThreadInfo,
   WebhookOptions,
 } from "chat";
-import { Message } from "chat";
+import { convertEmojiPlaceholders, Message } from "chat";
 import { cardToGitHubMarkdown } from "./cards";
 import { GitHubFormatConverter } from "./markdown";
 import type {
@@ -568,6 +568,9 @@ export class GitHubAdapter
       body = this.formatConverter.renderPostable(message);
     }
 
+    // Convert emoji placeholders to unicode
+    body = convertEmojiPlaceholders(body, "github");
+
     if (reviewCommentId) {
       // Review comment thread - reply with in_reply_to
       const { data: comment } = await octokit.pulls.createReplyForReviewComment(
@@ -644,6 +647,9 @@ export class GitHubAdapter
     } else {
       body = this.formatConverter.renderPostable(message);
     }
+
+    // Convert emoji placeholders to unicode
+    body = convertEmojiPlaceholders(body, "github");
 
     if (reviewCommentId) {
       // Review comment
