@@ -200,7 +200,9 @@ Linear supports standard [emoji reactions](https://linear.app/docs/comment-on-is
 
 ## OAuth Setup Guide
 
-This guide walks through setting up a Linear OAuth application. This gives the bot its own identity in Linear rather than acting as your personal account.
+This section is only relevant if you chose [Option B: OAuth Application](#option-b-oauth-application-recommended-for-apps). If you're using a personal API key (Option A), you can skip this entirely.
+
+Setting up an OAuth application gives the bot its own identity in Linear rather than acting as your personal account.
 
 ### 1. Create the OAuth Application
 
