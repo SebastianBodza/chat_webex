@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
-  decodeBase64Key,
+  decodeKey,
   decryptToken,
   encryptToken,
   isEncryptedTokenData,
@@ -9,6 +9,7 @@ import {
 
 const TEST_KEY = crypto.randomBytes(32);
 const TEST_KEY_BASE64 = TEST_KEY.toString("base64");
+const TEST_KEY_HEX = TEST_KEY.toString("hex");
 
 describe("encryptToken / decryptToken", () => {
   it("round-trips a token correctly", () => {
@@ -41,27 +42,33 @@ describe("encryptToken / decryptToken", () => {
   });
 });
 
-describe("decodeBase64Key", () => {
+describe("decodeKey", () => {
   it("decodes a valid 32-byte base64 key", () => {
-    const key = decodeBase64Key(TEST_KEY_BASE64);
+    const key = decodeKey(TEST_KEY_BASE64);
+    expect(key.length).toBe(32);
+    expect(Buffer.compare(key, TEST_KEY)).toBe(0);
+  });
+
+  it("decodes a valid 64-char hex key", () => {
+    const key = decodeKey(TEST_KEY_HEX);
     expect(key.length).toBe(32);
     expect(Buffer.compare(key, TEST_KEY)).toBe(0);
   });
 
   it("trims whitespace", () => {
-    const key = decodeBase64Key(`  ${TEST_KEY_BASE64}  `);
+    const key = decodeKey(`  ${TEST_KEY_BASE64}  `);
     expect(key.length).toBe(32);
   });
 
   it("throws for non-32-byte key", () => {
     const shortKey = crypto.randomBytes(16).toString("base64");
-    expect(() => decodeBase64Key(shortKey)).toThrow(
+    expect(() => decodeKey(shortKey)).toThrow(
       "Encryption key must decode to exactly 32 bytes",
     );
   });
 
   it("throws for empty string", () => {
-    expect(() => decodeBase64Key("")).toThrow();
+    expect(() => decodeKey("")).toThrow();
   });
 });
 

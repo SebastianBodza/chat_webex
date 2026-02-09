@@ -42,7 +42,7 @@ import {
 import { cardToBlockKit, cardToFallbackText } from "./cards";
 import type { EncryptedTokenData } from "./crypto";
 import {
-  decodeBase64Key,
+  decodeKey,
   decryptToken,
   encryptToken,
   isEncryptedTokenData,
@@ -257,7 +257,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     this.clientSecret = config.clientSecret;
 
     if (config.encryptionKey) {
-      this.encryptionKey = decodeBase64Key(config.encryptionKey);
+      this.encryptionKey = decodeKey(config.encryptionKey);
     }
   }
 
@@ -2052,7 +2052,7 @@ export function createSlackAdapter(config: SlackAdapterConfig): SlackAdapter {
 export { cardToBlockKit, cardToFallbackText } from "./cards";
 export type { EncryptedTokenData } from "./crypto";
 // Re-export crypto utilities for advanced use
-export { decodeBase64Key } from "./crypto";
+export { decodeKey } from "./crypto";
 // Re-export format converter for advanced use
 export {
   SlackFormatConverter,

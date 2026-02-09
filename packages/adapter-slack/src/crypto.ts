@@ -62,11 +62,14 @@ export function isEncryptedTokenData(
   );
 }
 
-export function decodeBase64Key(rawKey: string): Buffer {
-  const key = Buffer.from(rawKey.trim(), "base64");
+export function decodeKey(rawKey: string): Buffer {
+  const trimmed = rawKey.trim();
+  // Detect hex encoding: 64 hex chars = 32 bytes
+  const isHex = /^[0-9a-fA-F]{64}$/.test(trimmed);
+  const key = Buffer.from(trimmed, isHex ? "hex" : "base64");
   if (key.length !== 32) {
     throw new Error(
-      `Encryption key must decode to exactly 32 bytes (received ${key.length})`,
+      `Encryption key must decode to exactly 32 bytes (received ${key.length}). Use a 64-char hex string or 44-char base64 string.`,
     );
   }
   return key;
