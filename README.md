@@ -202,6 +202,7 @@ import {
   TextInput,
   Select,
   SelectOption,
+  RadioSelect,
 } from "chat";
 
 // Simple card with buttons
@@ -243,6 +244,25 @@ await thread.post(
   <Card title="Product Update">
     <Image url="https://example.com/product.png" alt="Product screenshot" />
     <CardText>Check out our new feature!</CardText>
+  </Card>
+);
+
+// Card with inline select and radio buttons
+await thread.post(
+  <Card title="Task Settings">
+    <Actions>
+      <Select id="priority" label="Priority" placeholder="Select priority">
+        <SelectOption label="High" value="high" description="Urgent tasks" />
+        <SelectOption label="Medium" value="medium" />
+        <SelectOption label="Low" value="low" />
+      </Select>
+      <RadioSelect id="status" label="Status">
+        <SelectOption label="Open" value="open" />
+        <SelectOption label="In Progress" value="in_progress" />
+        <SelectOption label="Done" value="done" />
+      </RadioSelect>
+      <Button id="save" style="primary">Save</Button>
+    </Actions>
   </Card>
 );
 ```
@@ -325,7 +345,8 @@ bot.onAction("feedback", async (event) => {
 | `Modal`        | Container with `callbackId`, `title`, `submitLabel`, `closeLabel`, `notifyOnClose` |
 | `TextInput`    | Text field with `id`, `label`, `placeholder`, `initialValue`, `multiline`, `optional`, `maxLength`    |
 | `Select`       | Dropdown with `id`, `label`, `placeholder`, `initialOption`, `optional`                               |
-| `SelectOption` | Option for Select with `label` and `value`                                                            |
+| `RadioSelect`  | Radio button group with `id`, `label`, `initialOption`, `optional`                                    |
+| `SelectOption` | Option for Select/RadioSelect with `label`, `value`, and `description` (optional)                     |
 
 ### Handling Modal Submissions
 

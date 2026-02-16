@@ -13,6 +13,7 @@ import {
   Fields,
   LinkButton,
   Modal,
+  RadioSelect,
   Section,
   Select,
   SelectOption,
@@ -93,11 +94,17 @@ bot.onNewMention(async (thread, message) => {
       </Fields>
       <Divider />
       <Actions>
+        <Select id="quick_action" label="Quick Action" placeholder="Choose...">
+          <SelectOption label="Say Hello" value="greet" />
+          <SelectOption label="Show Info" value="info" />
+          <SelectOption label="Get Help" value="help" />
+        </Select>
         <Button id="hello" style="primary">
           Say Hello
         </Button>
         <Button id="ephemeral">Ephemeral response</Button>
         <Button id="info">Show Info</Button>
+        <Button id="choose_plan">Choose Plan</Button>
         <Button id="feedback">Send Feedback</Button>
         <Button id="messages">Fetch Messages</Button>
         <Button id="report" value="bug">
@@ -152,6 +159,59 @@ bot.onModalSubmit("ephemeral_modal_form", async (event) => {
     <Card title={`${emoji.check} Submitted!`}>
       <Text>Your response: **{event.values.response}**</Text>
       <Text>The original ephemeral message was updated.</Text>
+    </Card>,
+  );
+});
+
+bot.onAction("quick_action", async (event) => {
+  const action = event.value;
+  if (action === "greet") {
+    await event.thread.post(`${emoji.wave} Hello, ${event.user.fullName}!`);
+  } else if (action === "info") {
+    await event.thread.post(
+      `${emoji.memo} You're on **${event.adapter.name}** in thread \`${event.threadId}\``,
+    );
+  } else if (action === "help") {
+    await event.thread.post(
+      `${emoji.question} Try mentioning me with "AI" to enable AI assistant mode!`,
+    );
+  }
+});
+
+bot.onAction("choose_plan", async (event) => {
+  event.thread.post(
+    <Card title="Choose Plan">
+      <Actions>
+        <RadioSelect id="plan_selected" label="Choose Plan">
+          <SelectOption
+            label="*All text elements*"
+            value="all_text"
+            description="Headers, body text, labels, and placeholders"
+          />
+          <SelectOption
+            label="*Headers and titles only*"
+            value="headers_titles"
+            description="Keep body text in the current system font"
+          />
+          <SelectOption
+            label="*Input fields and placeholders*"
+            value="input_fields"
+            description="Only the composer textarea and its placeholder"
+          />
+          <SelectOption
+            label="*Everything except buttons*"
+            value="except_buttons"
+            description="All text, but leave button labels unchanged"
+          />
+        </RadioSelect>
+      </Actions>
+    </Card>,
+  );
+});
+bot.onAction("plan_selected", async (event) => {
+  event.thread.post(
+    <Card title={`${emoji.check} Plan Chosen!`}>
+      <Text>You chose plan *{event.value}*</Text>
     </Card>,
   );
 });
