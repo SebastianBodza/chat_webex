@@ -27,7 +27,7 @@ pnpm add chat @chat-adapter/state-memory
 Create a `lib/bot.ts` file that configures the `Chat` instance:
 
 ```typescript title="lib/bot.ts" lineNumbers
-import { Chat } from "chat";
+import { Chat, ConsoleLogger } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createRedisState } from "@chat-adapter/state-redis";
 
@@ -37,9 +37,14 @@ export const bot = new Chat({
     slack: createSlackAdapter({
       botToken: process.env.SLACK_BOT_TOKEN!,
       signingSecret: process.env.SLACK_SIGNING_SECRET!,
+      logger: new ConsoleLogger(),
     }),
   },
-  state: createRedisState({ url: process.env.REDIS_URL! }),
+  state: createRedisState({
+    url: process.env.REDIS_URL!,
+    logger: new ConsoleLogger(),
+  }),
+  logger: new ConsoleLogger(),
 });
 
 // Respond to @mentions
@@ -66,9 +71,9 @@ type Platform = keyof typeof bot.webhooks;
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ platform: string }> }
+  RouteContext<"/api/webhooks/[platform]">
 ) {
-  const { platform } = await params;
+  const { platform } = await context.params;
 
   const handler = bot.webhooks[platform as Platform];
   if (!handler) {
