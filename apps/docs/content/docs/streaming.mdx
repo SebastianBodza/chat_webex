@@ -12,7 +12,7 @@ Chat SDK accepts any `AsyncIterable<string>` as a message, enabling real-time st
 
 Pass an AI SDK `textStream` directly to `thread.post()`:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { ToolLoopAgent } from "ai";
 
 const agent = new ToolLoopAgent({
@@ -30,7 +30,7 @@ bot.onNewMention(async (thread, message) => {
 
 Any async iterable works:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const stream = (async function* () {
   yield "Processing";
   yield "...";
@@ -51,7 +51,7 @@ await thread.post(stream);
 
 The post+edit fallback throttles edits to avoid rate limits. Configure the update interval when creating your `Chat` instance:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const bot = new Chat({
   // ...
   streamingUpdateIntervalMs: 500, // Default: 500ms
@@ -62,7 +62,7 @@ const bot = new Chat({
 
 Combine message history with streaming for multi-turn AI conversations:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onSubscribedMessage(async (thread, message) => {
   // Fetch recent messages for context
   const result = await thread.adapter.fetchMessages(thread.id, { limit: 20 });

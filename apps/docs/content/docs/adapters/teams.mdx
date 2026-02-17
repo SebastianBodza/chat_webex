@@ -14,7 +14,7 @@ pnpm add @chat-adapter/teams
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createTeamsAdapter } from "@chat-adapter/teams";
 
@@ -78,7 +78,7 @@ bot.onNewMention(async (thread, message) => {
 
 Create a `manifest.json` file:
 
-```json
+```json title="manifest.json" lineNumbers
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
   "manifestVersion": "1.16",
@@ -145,7 +145,7 @@ Create icon files (32x32 `outline.png` and 192x192 `color.png`), then zip all th
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 TEAMS_APP_ID=...
 TEAMS_APP_PASSWORD=...
 TEAMS_APP_TENANT_ID=...  # Required for SingleTenant

@@ -26,7 +26,7 @@ Chat SDK has three core concepts:
 2. **Adapters** — platform-specific implementations that handle webhook parsing, message formatting, and API calls
 3. **State** — a pluggable persistence layer for thread subscriptions and distributed locking
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createRedisState } from "@chat-adapter/state-redis";

@@ -16,7 +16,7 @@ pnpm add @chat-adapter/state-redis
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createRedisState } from "@chat-adapter/state-redis";
 
@@ -33,7 +33,7 @@ const bot = new Chat({
 
 If you already have a connected Redis client, pass it directly:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { createClient } from "redis";
 
 const client = createClient({ url: "redis://localhost:6379" });
@@ -46,7 +46,7 @@ const state = createRedisState({ client });
 
 All keys are namespaced under a configurable prefix (default: `"chat-sdk"`):
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const state = createRedisState({
   url: process.env.REDIS_URL!,
   keyPrefix: "my-bot",
@@ -65,7 +65,7 @@ const state = createRedisState({
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 REDIS_URL=redis://localhost:6379
 ```
 

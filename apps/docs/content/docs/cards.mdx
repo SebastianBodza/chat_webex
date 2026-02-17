@@ -26,13 +26,13 @@ Configure your `tsconfig.json` to use the Chat SDK JSX runtime:
 
 Or use a per-file pragma:
 
-```tsx
+```tsx title="lib/bot.tsx"
 /** @jsxImportSource chat */
 ```
 
 ## Basic card
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 import { Card, CardText, Button, Actions } from "chat";
 
 await thread.post(
@@ -52,7 +52,7 @@ await thread.post(
 
 The top-level container. Accepts `title` and optional `subtitle`.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Card title="My Card" subtitle="Optional subtitle">
   {/* children */}
 </Card>
@@ -62,7 +62,7 @@ The top-level container. Accepts `title` and optional `subtitle`.
 
 Renders formatted text. Supports a subset of markdown.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <CardText>**Bold** and _italic_ text</CardText>
 <CardText style="bold">Bold section header</CardText>
 ```
@@ -75,7 +75,7 @@ Use `CardText` instead of `Text` when using JSX to avoid conflicts with React's 
 
 Groups related content together.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Section>
   <CardText>Section content here</CardText>
 </Section>
@@ -85,7 +85,7 @@ Groups related content together.
 
 Renders key-value pairs in a compact layout.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Fields>
   <Field label="Name" value="John Doe" />
   <Field label="Role" value="Developer" />
@@ -97,7 +97,7 @@ Renders key-value pairs in a compact layout.
 
 An action button that triggers an `onAction` handler.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Button id="approve" style="primary">Approve</Button>
 <Button id="reject" style="danger">Reject</Button>
 <Button id="details">View Details</Button>
@@ -105,7 +105,7 @@ An action button that triggers an `onAction` handler.
 
 The `id` maps to your `onAction` handler. Optional `value` passes extra data:
 
-```tsx
+```tsx title="lib/bot.tsx"
 <Button id="report" value="bug">Report Bug</Button>
 ```
 
@@ -113,7 +113,7 @@ The `id` maps to your `onAction` handler. Optional `value` passes extra data:
 
 Opens an external URL. No `onAction` handler needed.
 
-```tsx
+```tsx title="lib/bot.tsx"
 <LinkButton url="https://example.com/order/1234">View Order</LinkButton>
 ```
 
@@ -121,7 +121,7 @@ Opens an external URL. No `onAction` handler needed.
 
 Container for buttons and interactive elements.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Actions>
   <Button id="approve" style="primary">Approve</Button>
   <Button id="reject" style="danger">Reject</Button>
@@ -133,7 +133,7 @@ Container for buttons and interactive elements.
 
 Inline dropdown menu.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Actions>
   <Select id="priority" label="Priority" placeholder="Select priority">
     <SelectOption label="High" value="high" description="Urgent tasks" />
@@ -149,7 +149,7 @@ Selection triggers an `onAction` handler with the `id` as the `actionId` and the
 
 Radio button group for mutually exclusive choices.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <Actions>
   <RadioSelect id="status" label="Status">
     <SelectOption label="Open" value="open" />
@@ -163,7 +163,7 @@ Radio button group for mutually exclusive choices.
 
 Embeds an image in the card.
 
-```tsx
+```tsx title="lib/bot.tsx"
 <Image url="https://example.com/screenshot.png" alt="Screenshot" />
 ```
 
@@ -171,7 +171,7 @@ Embeds an image in the card.
 
 A visual separator between sections.
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 <CardText>Above the line</CardText>
 <Divider />
 <CardText>Below the line</CardText>
@@ -179,7 +179,7 @@ A visual separator between sections.
 
 ## Full example
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 import {
   Card, CardText, Button, LinkButton, Actions,
   Section, Fields, Field, Divider, Image,

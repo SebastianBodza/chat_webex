@@ -16,7 +16,7 @@ pnpm add @chat-adapter/github
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createGitHubAdapter } from "@chat-adapter/github";
 
@@ -46,7 +46,7 @@ Best for personal projects, testing, or single-repo bots.
 2. Create a new token with `repo` scope
 3. Set `GITHUB_TOKEN` environment variable
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createGitHubAdapter({
   token: process.env.GITHUB_TOKEN!,
   webhookSecret: process.env.GITHUB_WEBHOOK_SECRET!,
@@ -83,7 +83,7 @@ Better rate limits, security, and supports multiple installations.
 
 **Single-tenant:**
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createGitHubAdapter({
   appId: process.env.GITHUB_APP_ID!,
   privateKey: process.env.GITHUB_PRIVATE_KEY!,
@@ -95,7 +95,7 @@ createGitHubAdapter({
 
 **Multi-tenant (omit `installationId`):**
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createGitHubAdapter({
   appId: process.env.GITHUB_APP_ID!,
   privateKey: process.env.GITHUB_PRIVATE_KEY!,
@@ -160,7 +160,7 @@ Supports GitHub's reaction emoji:
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 # Personal Access Token auth
 GITHUB_TOKEN=ghp_xxxxxxxxxxxx
 

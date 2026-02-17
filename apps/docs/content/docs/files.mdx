@@ -10,7 +10,7 @@ prerequisites:
 
 Attach files to messages using the `files` property:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const reportBuffer = Buffer.from("PDF content");
 
 await thread.post({
@@ -27,7 +27,7 @@ await thread.post({
 
 ### Multiple files
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 await thread.post({
   markdown: "Attached are the images:",
   files: [
@@ -39,7 +39,7 @@ await thread.post({
 
 ### Files without text
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 await thread.post({
   markdown: "",
   files: [{ data: buffer, filename: "document.xlsx" }],
@@ -50,7 +50,7 @@ await thread.post({
 
 Access attachments from incoming messages:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onSubscribedMessage(async (thread, message) => {
   for (const attachment of message.attachments ?? []) {
     console.log(`File: ${attachment.name}, Type: ${attachment.mimeType}`);

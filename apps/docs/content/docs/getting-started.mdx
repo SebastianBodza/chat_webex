@@ -24,7 +24,7 @@ pnpm add chat @chat-adapter/slack @chat-adapter/state-memory
 
 Create a `lib/bot.ts` file that configures the `Chat` instance:
 
-```typescript title="lib/bot.ts"
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createRedisState } from "@chat-adapter/state-redis";
@@ -56,7 +56,7 @@ bot.onSubscribedMessage(async (thread, message) => {
 
 Create an API route that handles incoming webhooks from all platforms:
 
-```typescript title="app/api/webhooks/[platform]/route.ts"
+```typescript title="app/api/webhooks/[platform]/route.ts" lineNumbers
 import { after } from "next/server";
 import { bot } from "@/lib/bot";
 
@@ -117,7 +117,7 @@ Each platform requires app configuration on their developer portal. See the [ada
 
 Add adapters for additional platforms alongside Slack:
 
-```typescript title="lib/bot.ts"
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createTeamsAdapter } from "@chat-adapter/teams";

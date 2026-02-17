@@ -14,7 +14,7 @@ Chat SDK uses an event-driven architecture. You register handlers for different 
 
 `onNewMention` fires when your bot is @-mentioned in a thread it hasn't subscribed to yet. This is the primary entry point for new conversations.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onNewMention(async (thread, message) => {
   await thread.subscribe();
   await thread.post("Hello! I'm now listening to this thread.");
@@ -25,7 +25,7 @@ bot.onNewMention(async (thread, message) => {
 
 `onSubscribedMessage` fires for every new message in a thread your bot has subscribed to. Once subscribed, all messages (including @mentions) route here instead of `onNewMention`.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onSubscribedMessage(async (thread, message) => {
   // Check if the bot was @-mentioned specifically
   if (message.isMention) {
@@ -41,7 +41,7 @@ bot.onSubscribedMessage(async (thread, message) => {
 
 `onNewMessage` fires for messages matching a regex pattern in threads the bot is **not** subscribed to. Useful for keyword-triggered responses.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onNewMessage(/^help$/i, async (thread, message) => {
   await thread.post("Here's how I can help...");
 });
@@ -51,7 +51,7 @@ bot.onNewMessage(/^help$/i, async (thread, message) => {
 
 `onReaction` fires when users add or remove emoji reactions to messages.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { emoji } from "chat";
 
 bot.onReaction(["thumbs_up", "heart"], async (event) => {
@@ -83,7 +83,7 @@ A `Thread` represents a conversation thread on any platform. It provides methods
 
 ### Post a message
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 // Plain text
 await thread.post("Hello world");
 
@@ -101,7 +101,7 @@ await thread.post({
 
 Subscriptions persist across restarts (stored in your state adapter). When a thread is subscribed, all messages route to `onSubscribedMessage`.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 await thread.subscribe();
 await thread.unsubscribe();
 
@@ -110,7 +110,7 @@ const subscribed = await thread.isSubscribed();
 
 ### Typing indicator
 
-```typescript
+```typescript title="lib/bot.ts"
 await thread.startTyping();
 ```
 
@@ -122,7 +122,7 @@ Not all platforms support typing indicators. Teams and Google Chat do not have t
 
 Access recent messages or iterate through full history:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 // Cached messages from the webhook payload
 const recent = thread.recentMessages;
 
@@ -142,7 +142,7 @@ for await (const msg of thread.allMessages) {
 
 Store typed, per-thread state that persists across requests:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 interface ThreadState {
   aiMode?: boolean;
   context?: string;
@@ -164,7 +164,7 @@ bot.onNewMention(async (thread) => {
 
 State is stored in your state adapter with a 30-day TTL. Use `{ replace: true }` to replace state entirely instead of merging:
 
-```typescript
+```typescript title="lib/bot.ts"
 await thread.setState({ aiMode: false }, { replace: true });
 ```
 
@@ -186,7 +186,7 @@ Incoming messages are normalized across platforms into a consistent format:
 
 ### Author
 
-```typescript
+```typescript lineNumbers
 interface Author {
   userId: string;
   userName: string;
@@ -200,7 +200,7 @@ interface Author {
 
 When you post a message, you get back a `SentMessage` with methods to edit, delete, and react:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const sent = await thread.post("Processing...");
 // Do some work...
 await sent.edit("Done!");
@@ -228,7 +228,7 @@ You typically don't need to construct these yourself — they're provided by the
 
 Configure logging when creating the `Chat` instance:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 // Use a built-in log level
 const bot = new Chat({
   // ...
@@ -247,7 +247,7 @@ const bot = new Chat({
 
 Pass child loggers to adapters for prefixed log output:
 
-```typescript
+```typescript title="lib/bot.ts"
 createSlackAdapter({
   // ...
   logger: logger.child("slack"),

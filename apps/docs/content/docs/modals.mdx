@@ -12,7 +12,7 @@ Modals open form dialogs in response to button clicks. They support text inputs,
 
 Modals are opened from [action handlers](/docs/actions) using `event.openModal()`:
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 import { Modal, TextInput, Select, SelectOption } from "chat";
 
 bot.onAction("feedback", async (event) => {
@@ -112,7 +112,7 @@ An option for `Select` or `RadioSelect`.
 
 Register a handler with `onModalSubmit` using the same `callbackId`:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onModalSubmit("feedback_form", async (event) => {
   const { message, category, email } = event.values;
 
@@ -165,7 +165,7 @@ bot.onModalSubmit("feedback_form", async (event) => {
 
 Optionally handle when users cancel a modal. Requires `notifyOnClose` on the `Modal` component:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onModalClose("feedback_form", async (event) => {
   console.log(`${event.user.userName} cancelled the feedback form`);
 
@@ -179,7 +179,7 @@ bot.onModalClose("feedback_form", async (event) => {
 
 Use `privateMetadata` to carry context from the button click through to the submit handler:
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 bot.onAction("report", async (event) => {
   await event.openModal(
     <Modal

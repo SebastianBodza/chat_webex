@@ -16,7 +16,7 @@ pnpm add @chat-adapter/slack
 
 For bots deployed to a single Slack workspace:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 
@@ -39,7 +39,7 @@ bot.onNewMention(async (thread, message) => {
 
 For apps installed across multiple Slack workspaces via OAuth, omit `botToken` and provide OAuth credentials instead. The adapter resolves tokens dynamically from your state adapter using the `team_id` from incoming webhooks.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createRedisState } from "@chat-adapter/state-redis";
 
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
 
 During webhook handling, the adapter resolves tokens automatically from `team_id`. Outside that context (e.g. cron jobs or background workers), use `getInstallation` and `withBotToken`:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const install = await slackAdapter.getInstallation(teamId);
 if (!install) throw new Error("Workspace not installed");
 
@@ -88,7 +88,7 @@ await slackAdapter.withBotToken(install.botToken, async () => {
 
 ### Removing installations
 
-```typescript
+```typescript title="lib/bot.ts"
 await slackAdapter.deleteInstallation(teamId);
 ```
 
@@ -181,7 +181,7 @@ For buttons, modals, and other interactive components:
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 SLACK_BOT_TOKEN=xoxb-...             # Single-workspace only
 SLACK_SIGNING_SECRET=...
 SLACK_CLIENT_ID=...                  # Multi-workspace only

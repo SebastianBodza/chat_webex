@@ -16,7 +16,7 @@ pnpm add @chat-adapter/linear
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createLinearAdapter } from "@chat-adapter/linear";
 
@@ -48,7 +48,7 @@ Best for personal projects, testing, or single-workspace bots. Actions are attri
 4. Choose team access
 5. Click **Create** and set `LINEAR_API_KEY`
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createLinearAdapter({
   apiKey: process.env.LINEAR_API_KEY!,
   webhookSecret: process.env.LINEAR_WEBHOOK_SECRET!,
@@ -65,7 +65,7 @@ The bot gets its own identity in Linear. The adapter handles token management in
 3. **Enable client credentials tokens** in the app settings
 4. Note the **Client ID** and **Client Secret**
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createLinearAdapter({
   clientId: process.env.LINEAR_CLIENT_ID!,
   clientSecret: process.env.LINEAR_CLIENT_SECRET!,
@@ -151,7 +151,7 @@ When a user writes a comment, the bot replies within the same comment thread.
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 # API Key auth
 LINEAR_API_KEY=lin_api_xxxxxxxxxxxx
 

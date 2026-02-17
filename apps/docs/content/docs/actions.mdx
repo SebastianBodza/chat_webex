@@ -12,7 +12,7 @@ Actions let you handle button clicks, dropdown selections, and other interactive
 
 ## Handle a specific action
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onAction("approve", async (event) => {
   await event.thread.post(`Order approved by ${event.user.fullName}!`);
 });
@@ -20,7 +20,7 @@ bot.onAction("approve", async (event) => {
 
 ## Handle multiple actions
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onAction(["approve", "reject"], async (event) => {
   const action = event.actionId === "approve" ? "approved" : "rejected";
   await event.thread.post(`Order ${action} by ${event.user.fullName}`);
@@ -31,7 +31,7 @@ bot.onAction(["approve", "reject"], async (event) => {
 
 Register a handler without an action ID to catch all actions:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onAction(async (event) => {
   console.log(`Action: ${event.actionId}, Value: ${event.value}`);
 });
@@ -58,12 +58,12 @@ The `event` object passed to action handlers:
 
 Use the `value` prop on buttons to pass extra context to your handler:
 
-```tsx
+```tsx title="lib/bot.tsx"
 <Button id="report" value="bug">Report Bug</Button>
 <Button id="report" value="feature">Request Feature</Button>
 ```
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 bot.onAction("report", async (event) => {
   if (event.value === "bug") {
     // Open bug report flow
@@ -77,7 +77,7 @@ bot.onAction("report", async (event) => {
 
 Use `event.openModal()` to open a [modal](/docs/modals) in response to a button click:
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 import { Modal, TextInput, Select, SelectOption } from "chat";
 
 bot.onAction("feedback", async (event) => {

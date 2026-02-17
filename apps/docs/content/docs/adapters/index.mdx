@@ -32,7 +32,7 @@ Each adapter implements a standard interface that the `Chat` class uses to route
 
 Register multiple adapters and your event handlers work across all of them:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createTeamsAdapter } from "@chat-adapter/teams";

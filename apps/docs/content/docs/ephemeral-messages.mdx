@@ -12,7 +12,7 @@ Ephemeral messages are visible only to a specific user within a thread. They're 
 
 ## Send an ephemeral message
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 await thread.postEphemeral(user, "Only you can see this!", {
   fallbackToDM: true,
 });
@@ -34,7 +34,7 @@ The `fallbackToDM` option is required and controls behavior on platforms without
 
 ## Check for fallback
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const result = await thread.postEphemeral(user, "Private notification", {
   fallbackToDM: true,
 });
@@ -48,7 +48,7 @@ if (result?.usedFallback) {
 
 Only send if the platform supports native ephemeral:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 const result = await thread.postEphemeral(user, "Contextual hint", {
   fallbackToDM: false,
 });
@@ -63,7 +63,7 @@ if (!result) {
 
 Cards work with ephemeral messages too:
 
-```tsx
+```tsx title="lib/bot.tsx" lineNumbers
 await thread.postEphemeral(
   event.user,
   <Card title="Ephemeral Card">

@@ -14,7 +14,7 @@ pnpm add @chat-adapter/discord
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createDiscordAdapter } from "@chat-adapter/discord";
 
@@ -141,7 +141,7 @@ By default, only direct user mentions (`@BotName`) trigger `onNewMention` handle
 3. Copy the role ID (right-click role in server settings with Developer Mode enabled)
 4. Add to `mentionRoleIds`:
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createDiscordAdapter({
   botToken: process.env.DISCORD_BOT_TOKEN!,
   publicKey: process.env.DISCORD_PUBLIC_KEY!,
@@ -163,7 +163,7 @@ Or set `DISCORD_MENTION_ROLE_IDS` as a comma-separated string.
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 DISCORD_BOT_TOKEN=your-bot-token
 DISCORD_PUBLIC_KEY=your-application-public-key
 DISCORD_APPLICATION_ID=your-application-id

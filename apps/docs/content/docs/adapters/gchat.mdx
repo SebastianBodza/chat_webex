@@ -14,7 +14,7 @@ pnpm add @chat-adapter/gchat
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createGoogleChatAdapter } from "@chat-adapter/gchat";
 
@@ -92,7 +92,7 @@ If your organization has the `iam.disableServiceAccountKeyCreation` constraint e
 
 By default, Google Chat only sends webhooks for @mentions. To receive all messages in a space, set up Workspace Events with Pub/Sub.
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 createGoogleChatAdapter({
   credentials: JSON.parse(process.env.GOOGLE_CHAT_CREDENTIALS!),
   pubsubTopic: process.env.GOOGLE_CHAT_PUBSUB_TOPIC,
@@ -167,7 +167,7 @@ Set `GOOGLE_CHAT_IMPERSONATE_USER` to an admin user email in your domain (e.g., 
 
 ## Environment variables
 
-```bash
+```bash title=".env.local"
 GOOGLE_CHAT_CREDENTIALS={"type":"service_account",...}
 
 # Optional: for receiving all messages

@@ -16,7 +16,7 @@ pnpm add @chat-adapter/state-ioredis
 
 ## Usage
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import { Chat } from "chat";
 import { createIORedisState } from "@chat-adapter/state-ioredis";
 
@@ -31,7 +31,7 @@ const bot = new Chat({
 
 ### Using an existing client
 
-```typescript
+```typescript title="lib/bot.ts" lineNumbers
 import Redis from "ioredis";
 
 const client = new Redis("redis://localhost:6379");
