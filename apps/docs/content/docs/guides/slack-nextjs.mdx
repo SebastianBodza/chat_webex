@@ -94,9 +94,14 @@ export const bot = new Chat({
     slack: createSlackAdapter({
       botToken: process.env.SLACK_BOT_TOKEN!,
       signingSecret: process.env.SLACK_SIGNING_SECRET!,
+      logger: new ConsoleLogger(),
     }),
   },
-  state: createRedisState({ url: process.env.REDIS_URL! }),
+  state: createRedisState({
+    url: process.env.REDIS_URL!,
+    logger: new ConsoleLogger(),
+  }),
+  logger: new ConsoleLogger(),
 });
 
 // Respond when someone @mentions the bot
@@ -125,9 +130,9 @@ type Platform = keyof typeof bot.webhooks;
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ platform: string }> }
+  context: RouteContext<"/api/webhooks/[platform]">
 ) {
-  const { platform } = await params;
+  const { platform } = await context.params;
 
   const handler = bot.webhooks[platform as Platform];
   if (!handler) {
@@ -184,9 +189,14 @@ export const bot = new Chat({
     slack: createSlackAdapter({
       botToken: process.env.SLACK_BOT_TOKEN!,
       signingSecret: process.env.SLACK_SIGNING_SECRET!,
+      logger: new ConsoleLogger(),
     }),
   },
-  state: createRedisState({ url: process.env.REDIS_URL! }),
+  state: createRedisState({
+    url: process.env.REDIS_URL!,
+    logger: new ConsoleLogger(),
+  }),
+  logger: new ConsoleLogger(),
 });
 
 bot.onNewMention(async (thread) => {
