@@ -1,0 +1,21 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---",
+    "getting-started",
+    "usage",
+    "---",
+    "adapters",
+    "state",
+    "---",
+    "cards",
+    "actions",
+    "modals",
+    "emoji",
+    "streaming",
+    "files",
+    "direct-messages",
+    "ephemeral-messages"
+  ]
+}

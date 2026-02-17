@@ -1,0 +1,66 @@
+---
+title: State adapters
+description: Configure persistence for thread subscriptions, distributed locking, and caching.
+type: reference
+prerequisites:
+  - /docs/getting-started
+---
+
+State adapters handle persistent storage for thread subscriptions, distributed locks (to prevent duplicate processing), and caching. You must provide a state adapter when creating a `Chat` instance.
+
+## Redis (production)
+
+```bash
+pnpm add @chat-adapter/state-redis
+```
+
+```typescript
+import { createRedisState } from "@chat-adapter/state-redis";
+
+const state = createRedisState({
+  url: process.env.REDIS_URL!,
+  keyPrefix: "chat-sdk", // optional, defaults to "chat-sdk"
+});
+```
+
+Redis is the recommended state adapter for production. It supports:
+
+- Persistent subscriptions across restarts
+- Distributed locking for multi-instance deployments
+- Key-value caching with TTL
+
+For serverless deployments (Vercel, AWS Lambda), use a serverless-compatible Redis provider like [Upstash](https://upstash.com).
+
+## ioredis (alternative)
+
+```bash
+pnpm add @chat-adapter/state-ioredis
+```
+
+```typescript
+import { createIoRedisState } from "@chat-adapter/state-ioredis";
+
+const state = createIoRedisState({
+  url: process.env.REDIS_URL!,
+});
+```
+
+Use this if you already have `ioredis` in your project or need its specific features (cluster support, Sentinel, etc.).
+
+## Memory (development)
+
+```bash
+pnpm add @chat-adapter/state-memory
+```
+
+```typescript
+import { createMemoryState } from "@chat-adapter/state-memory";
+
+const state = createMemoryState();
+```
+
+The in-memory state adapter stores everything in process memory. State is lost on restart and doesn't work across multiple instances.
+
+<Callout type="warn">
+Only use the memory adapter for local development and testing. For production, use Redis or ioredis.
+</Callout>
