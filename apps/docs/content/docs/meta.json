@@ -6,8 +6,6 @@
     "getting-started",
     "usage",
     "---",
-    "state",
-    "---",
     "cards",
     "actions",
     "modals",
@@ -17,7 +15,10 @@
     "direct-messages",
     "ephemeral-messages",
     "---",
-    "---Adapters---",
+    "---State Adapters---",
+    "...state",
+    "---",
+    "---Platform Adapters---",
     "...adapters"
   ]
 }
