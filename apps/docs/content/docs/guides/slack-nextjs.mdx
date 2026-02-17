@@ -1,6 +1,6 @@
 ---
-title: Slack bot with Next.js
-description: Build a Slack bot from scratch using Chat SDK and Next.js.
+title: Slack bot with Next.js and Redis
+description: Build a Slack bot from scratch using Chat SDK, Next.js, and Redis.
 type: guide
 prerequisites: []
 related:
@@ -17,7 +17,7 @@ This guide walks through building a Slack bot with Next.js, covering project set
 - Node.js 18+
 - [pnpm](https://pnpm.io) (or npm/yarn)
 - A Slack workspace where you can install apps
-- A Redis instance for state management (or use the in-memory adapter for development)
+- A Redis instance for state management
 
 ## Create a Next.js app
 
@@ -29,45 +29,65 @@ cd my-slack-bot
 pnpm add chat @chat-adapter/slack @chat-adapter/state-redis
 ```
 
-For local development without Redis, use the in-memory state adapter instead:
-
-```sh title="Terminal"
-pnpm add @chat-adapter/state-memory
-```
-
 ## Create a Slack app
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps)
-2. Click **Create New App** then **From scratch**
-3. Enter an app name and select your workspace
-4. Click **Create App**
+2. Click **Create New App** then **From an app manifest**
+3. Select your workspace and paste the following manifest:
 
-### Configure bot token scopes
+```yaml title="slack-manifest.yml"
+display_information:
+  name: My Bot
+  description: A bot built with Chat SDK
 
-Go to **OAuth & Permissions** and add these **Bot Token Scopes**:
+features:
+  bot_user:
+    display_name: My Bot
+    always_online: true
 
-| Scope | Description |
-|-------|-------------|
-| `app_mentions:read` | Receive @mention events |
-| `channels:history` | Read messages in public channels |
-| `channels:read` | View basic channel info |
-| `chat:write` | Send messages |
-| `groups:history` | Read messages in private channels |
-| `im:history` | Read direct messages |
-| `reactions:read` | View emoji reactions |
-| `reactions:write` | Add/remove emoji reactions |
-| `users:read` | View user info (for display names) |
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - channels:history
+      - channels:read
+      - chat:write
+      - groups:history
+      - groups:read
+      - im:history
+      - im:read
+      - mpim:history
+      - mpim:read
+      - reactions:read
+      - reactions:write
+      - users:read
 
-### Install app to workspace
+settings:
+  event_subscriptions:
+    request_url: https://your-domain.com/api/webhooks/slack
+    bot_events:
+      - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
+  interactivity:
+    is_enabled: true
+    request_url: https://your-domain.com/api/webhooks/slack
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
+```
 
-1. Go to **OAuth & Permissions**
-2. Click **Install to Workspace** and authorize
-3. Copy the **Bot User OAuth Token** (`xoxb-...`) — you'll need this as `SLACK_BOT_TOKEN`
+4. Replace `https://your-domain.com/api/webhooks/slack` with your deployed webhook URL
+5. Click **Create**
 
-### Get signing secret
+### Get credentials
 
-1. Go to **Basic Information**
-2. Under **App Credentials**, copy the **Signing Secret** — you'll need this as `SLACK_SIGNING_SECRET`
+After creating the app:
+
+1. Go to **OAuth & Permissions**, click **Install to Workspace**, and copy the **Bot User OAuth Token** (`xoxb-...`) — you'll need this as `SLACK_BOT_TOKEN`
+2. Go to **Basic Information** → **App Credentials** and copy the **Signing Secret** — you'll need this as `SLACK_SIGNING_SECRET`
 
 ## Configure environment variables
 
@@ -147,24 +167,6 @@ export async function POST(
 
 This creates a `POST /api/webhooks/slack` endpoint. The `waitUntil` option ensures message processing completes after the HTTP response is sent — required on serverless platforms where the function would otherwise terminate before your handlers finish.
 
-## Configure event subscriptions
-
-Back in the Slack app settings:
-
-1. Go to **Event Subscriptions**
-2. Toggle **Enable Events** to On
-3. Set **Request URL** to `https://your-domain.com/api/webhooks/slack`
-4. Under **Subscribe to bot events**, add:
-   - `app_mention` — when someone @mentions your bot
-   - `message.channels` — messages in public channels
-   - `message.groups` — messages in private channels
-   - `message.im` — direct messages
-5. Click **Save Changes**
-
-<Callout type="info">
-  During local development, use a tunneling tool like [ngrok](https://ngrok.com) or [`vercel dev`](https://vercel.com/docs/cli/dev) to expose your local server. Set the Request URL to your tunnel URL, e.g. `https://abc123.ngrok.io/api/webhooks/slack`.
-</Callout>
-
 ## Test locally
 
 1. Start your development server (`pnpm dev`)
@@ -222,12 +224,6 @@ bot.onAction("info", async (event) => {
 });
 ```
 
-For interactive components to work, enable interactivity in your Slack app:
-
-1. Go to **Interactivity & Shortcuts**
-2. Toggle **Interactivity** to On
-3. Set **Request URL** to `https://your-domain.com/api/webhooks/slack`
-
 <Callout type="info">
   The file extension must be `.tsx` (not `.ts`) when using JSX components like `Card` and `Button`. Make sure your `tsconfig.json` has `"jsx": "react-jsx"` and `"jsxImportSource": "chat"`.
 </Callout>
@@ -240,11 +236,7 @@ Deploy your bot to Vercel:
 vercel deploy
 ```
 
-After deployment:
-
-1. Update the Slack **Event Subscriptions** Request URL to your production URL (e.g. `https://my-slack-bot.vercel.app/api/webhooks/slack`)
-2. Update the **Interactivity** Request URL to the same production URL
-3. Set your environment variables in the Vercel dashboard (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `REDIS_URL`)
+After deployment, set your environment variables in the Vercel dashboard (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `REDIS_URL`). If your manifest used a placeholder URL, update the **Event Subscriptions** and **Interactivity** Request URLs in your [Slack app settings](https://api.slack.com/apps) to your production URL.
 
 ## Next steps
 
