@@ -1048,11 +1048,11 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
       return;
     }
 
-    // For DMs (channel_type: "im"), use empty threadTs so all messages in the DM
-    // match the DM subscription created by openDM(). This treats the entire DM
-    // conversation as a single "thread" for subscription purposes.
+    // For DMs: top-level messages use empty threadTs (matches openDM subscriptions),
+    // thread replies use thread_ts for per-conversation isolation.
+    // For channels: always use thread_ts or ts for per-thread IDs.
     const isDM = event.channel_type === "im";
-    const threadTs = isDM ? "" : event.thread_ts || event.ts;
+    const threadTs = isDM ? event.thread_ts || "" : event.thread_ts || event.ts;
     const threadId = this.encodeThreadId({
       channel: event.channel,
       threadTs,
@@ -1067,7 +1067,7 @@ export class SlackAdapter implements Adapter<SlackThreadId, unknown> {
     // Node.js AsyncLocalStorage propagates context to async continuations as long as
     // the Promise is created within the run() callback. We call processMessage inside
     // run() so the async task and all its awaits inherit the context.
-    const isMention = event.type === "app_mention";
+    const isMention = isDM || event.type === "app_mention";
     const factory = async (): Promise<Message<unknown>> => {
       const msg = await this.parseSlackMessage(event, threadId);
       if (isMention) {

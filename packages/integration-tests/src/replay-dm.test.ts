@@ -21,6 +21,7 @@ import { Chat, type Logger, type Message } from "chat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import gchatFixtures from "../fixtures/replay/dm/gchat.json";
 import slackFixtures from "../fixtures/replay/dm/slack.json";
+import slackDirectFixtures from "../fixtures/replay/dm/slack-direct.json";
 import teamsFixtures from "../fixtures/replay/dm/teams.json";
 import {
   createMockGoogleChatApi,
@@ -231,6 +232,129 @@ describe("DM Replay Tests", () => {
           channel: slackFixtures.dmChannelId,
           text: expect.stringContaining("Got your DM: Hey!"),
         }),
+      );
+    });
+  });
+
+  describe("Slack - Direct DM (implicit mention)", () => {
+    let chat: Chat<{ slack: SlackAdapter }>;
+    let mockSlackClient: MockSlackClient;
+    let tracker: ReturnType<typeof createWaitUntilTracker>;
+    let state: DMFlowState;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      state = createDMFlowState();
+
+      const slackAdapter = createSlackAdapter({
+        botToken: SLACK_BOT_TOKEN,
+        signingSecret: SLACK_SIGNING_SECRET,
+        logger: mockLogger,
+      });
+      mockSlackClient = createMockSlackClient();
+      mockSlackClient.auth.test.mockResolvedValue({
+        ok: true,
+        user_id: slackDirectFixtures.botUserId,
+        user: slackDirectFixtures.botName,
+      });
+      injectMockSlackClient(slackAdapter, mockSlackClient);
+
+      chat = new Chat({
+        userName: slackDirectFixtures.botName,
+        adapters: { slack: slackAdapter },
+        state: createMemoryState(),
+        logger: "error",
+      });
+
+      chat.onNewMention(async (thread, message) => {
+        state.mentionMessage = message;
+        await thread.subscribe();
+        await thread.post(`Hi! You said: ${message.text}`);
+      });
+
+      chat.onSubscribedMessage(async (thread, message) => {
+        state.dmMessage = message;
+        await thread.post(`Follow-up: ${message.text}`);
+      });
+
+      tracker = createWaitUntilTracker();
+    });
+
+    afterEach(async () => {
+      await chat.shutdown();
+    });
+
+    const sendWebhook = async (fixture: unknown) => {
+      await chat.webhooks.slack(
+        createSignedSlackRequest(JSON.stringify(fixture)),
+        { waitUntil: tracker.waitUntil },
+      );
+      await tracker.waitForAll();
+    };
+
+    it("should treat direct DM as mention (no prior channel interaction)", async () => {
+      await sendWebhook(slackDirectFixtures.directDM);
+
+      // DM messages have isMention=true, so onNewMention fires
+      expect(state.mentionMessage).not.toBeNull();
+      expect(state.mentionMessage?.text).toBe("hello hello");
+    });
+
+    it("should use empty threadTs for top-level DM messages", async () => {
+      await sendWebhook(slackDirectFixtures.directDM);
+
+      expect(state.mentionMessage).not.toBeNull();
+      // Top-level DM → threadId is "slack:<channel>:" with empty threadTs
+      expect(state.mentionMessage?.threadId).toBe(
+        `slack:${slackDirectFixtures.dmChannelId}:`,
+      );
+    });
+
+    it("should respond to direct DM", async () => {
+      await sendWebhook(slackDirectFixtures.directDM);
+
+      expect(mockSlackClient.chat.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: slackDirectFixtures.dmChannelId,
+          text: expect.stringContaining("Hi! You said: hello hello"),
+        }),
+      );
+    });
+
+    it("should receive follow-up DM as subscribed message", async () => {
+      // First DM triggers onNewMention and subscribes
+      await sendWebhook(slackDirectFixtures.directDM);
+      expect(state.mentionMessage).not.toBeNull();
+
+      // Second DM (real recorded follow-up) triggers onSubscribedMessage
+      await sendWebhook(slackDirectFixtures.followUp);
+
+      expect(state.dmMessage).not.toBeNull();
+      expect(state.dmMessage?.text).toBe("cool!!");
+
+      expect(mockSlackClient.chat.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: slackDirectFixtures.dmChannelId,
+          text: expect.stringContaining("Follow-up: cool!!"),
+        }),
+      );
+    });
+
+    it("should use thread_ts for DM thread replies", async () => {
+      // Construct a DM reply with thread_ts pointing to the first message
+      const dmReply = {
+        ...slackDirectFixtures.followUp,
+        event: {
+          ...slackDirectFixtures.followUp.event,
+          thread_ts: slackDirectFixtures.directDM.event.ts,
+        },
+      };
+      await sendWebhook(dmReply);
+
+      expect(state.mentionMessage).not.toBeNull();
+      // DM reply with thread_ts → threadId includes the parent ts
+      expect(state.mentionMessage?.threadId).toBe(
+        `slack:${slackDirectFixtures.dmChannelId}:${slackDirectFixtures.directDM.event.ts}`,
       );
     });
   });
