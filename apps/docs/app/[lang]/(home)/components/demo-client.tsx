@@ -1,0 +1,360 @@
+"use client";
+
+import { AnimatePresence, motion } from "motion/react";
+import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
+import { HashIcon } from "lucide-react";
+
+type ChatMessage = {
+  id: string;
+  author: string;
+  initials: string;
+  color: string;
+  text: string;
+};
+
+type ReactionTarget = string | null;
+type ActiveHandler =
+  | "onNewMention"
+  | "onReaction"
+  | "onSubscribedMessage"
+  | null;
+
+type SerializedToken = {
+  content: string;
+  htmlStyle?: Record<string, string>;
+};
+
+export type SerializedHandler = {
+  key: "onNewMention" | "onReaction" | "onSubscribedMessage";
+  lines: SerializedToken[][];
+};
+
+const MESSAGES: ChatMessage[] = [
+  {
+    id: "m1",
+    author: "Alice",
+    initials: "A",
+    color: "bg-violet-500",
+    text: "Has anyone tried the new API?",
+  },
+  {
+    id: "m2",
+    author: "Bob",
+    initials: "B",
+    color: "bg-blue-500",
+    text: "Yeah, docs look great",
+  },
+  {
+    id: "m3",
+    author: "Alice",
+    initials: "A",
+    color: "bg-violet-500",
+    text: "@ChatBot summarize this thread",
+  },
+  {
+    id: "m4",
+    author: "ChatBot",
+    initials: "CB",
+    color: "bg-emerald-500",
+    text: "Sure! Here's a quick summary...",
+  },
+  {
+    id: "m5",
+    author: "Bob",
+    initials: "B",
+    color: "bg-blue-500",
+    text: "Can you check for updates too?",
+  },
+  {
+    id: "m6",
+    author: "ChatBot",
+    initials: "CB",
+    color: "bg-emerald-500",
+    text: "Checking now...",
+  },
+  {
+    id: "m7",
+    author: "Alice",
+    initials: "A",
+    color: "bg-violet-500",
+    text: "Thanks, that's super helpful!",
+  },
+  {
+    id: "m8",
+    author: "Bob",
+    initials: "B",
+    color: "bg-blue-500",
+    text: "Agreed, nice work 🎉",
+  },
+];
+
+type TimelineEntry = {
+  delay: number;
+  visibleCount: number;
+  reaction: ReactionTarget;
+  handler: ActiveHandler;
+};
+
+const TIMELINE: TimelineEntry[] = [
+  { delay: 0, visibleCount: 0, reaction: null, handler: null },
+  { delay: 800, visibleCount: 1, reaction: null, handler: null },
+  { delay: 1200, visibleCount: 2, reaction: null, handler: null },
+  {
+    delay: 1400,
+    visibleCount: 3,
+    reaction: null,
+    handler: "onNewMention",
+  },
+  { delay: 1800, visibleCount: 4, reaction: null, handler: null },
+  { delay: 1600, visibleCount: 4, reaction: "m4", handler: "onReaction" },
+  {
+    delay: 2000,
+    visibleCount: 5,
+    reaction: "m4",
+    handler: "onSubscribedMessage",
+  },
+  { delay: 1800, visibleCount: 6, reaction: "m4", handler: null },
+  { delay: 1200, visibleCount: 7, reaction: "m4", handler: null },
+  { delay: 1200, visibleCount: 8, reaction: "m4", handler: null },
+  { delay: 3000, visibleCount: 0, reaction: null, handler: null },
+];
+
+const ChatBubble = ({ message }: { message: ChatMessage }) => (
+  <motion.div
+    animate={{ opacity: 1, y: 0 }}
+    className="flex items-start gap-2.5"
+    exit={{ opacity: 0 }}
+    initial={{ opacity: 0, y: 12 }}
+    transition={{ duration: 0.3 }}
+  >
+    <div
+      className={cn(
+        "flex size-8 shrink-0 items-center justify-center rounded-md font-semibold text-white text-xs",
+        message.color
+      )}
+    >
+      {message.initials}
+    </div>
+    <div className="min-w-0">
+      <div className="flex items-baseline gap-1.5">
+        <span className="font-semibold text-foreground text-sm">
+          {message.author}
+        </span>
+        <span className="text-muted-foreground text-xs">12:00 PM</span>
+      </div>
+      <p className="text-foreground text-sm">
+          {message.text.split(/(@ChatBot)/g).map((part) =>
+            part === "@ChatBot" ? (
+              <span
+                className="rounded bg-primary/15 px-0.5 font-medium text-primary"
+                key={part}
+              >
+                @ChatBot
+              </span>
+            ) : (
+              part
+            )
+          )}
+        </p>
+    </div>
+  </motion.div>
+);
+
+const ReactionBadge = () => (
+  <motion.span
+    animate={{ opacity: 1, scale: 1 }}
+    className="mt-1 ml-10.5 inline-flex items-center gap-1 rounded-full border bg-muted px-1.5 py-0.5 text-xs"
+    initial={{ opacity: 0, scale: 0.8 }}
+    transition={{ duration: 0.25 }}
+  >
+    👍 1
+  </motion.span>
+);
+
+const TokenSpan = ({ token }: { token: SerializedToken }) => {
+  const tokenStyle: Record<string, string> = {};
+
+  if (token.htmlStyle) {
+    for (const [key, value] of Object.entries(token.htmlStyle)) {
+      if (key === "color" || key === "--shiki-light") {
+        tokenStyle["--sdm-c"] = value;
+      } else if (
+        key === "background-color" ||
+        key === "--shiki-light-bg"
+      ) {
+        tokenStyle["--sdm-tbg"] = value;
+      } else {
+        tokenStyle[key] = value;
+      }
+    }
+  }
+
+  const hasBg = Boolean(tokenStyle["--sdm-tbg"]);
+
+  return (
+    <span
+      className={cn(
+        "text-[var(--sdm-c,inherit)]",
+        "dark:text-[var(--shiki-dark,var(--sdm-c,inherit))]",
+        hasBg && "bg-[var(--sdm-tbg)]",
+        hasBg && "dark:bg-[var(--shiki-dark-bg,var(--sdm-tbg))]"
+      )}
+      style={tokenStyle as CSSProperties}
+    >
+      {token.content}
+    </span>
+  );
+};
+
+const HandlerBlock = ({
+  handler,
+  isActive,
+}: {
+  handler: SerializedHandler;
+  isActive: boolean;
+}) => (
+  <div className="relative">
+    <AnimatePresence>
+      {isActive && (
+        <motion.div
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 border-primary border-l-2 bg-primary/10"
+          exit={{ opacity: 0 }}
+          initial={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
+    </AnimatePresence>
+    <code className="relative grid min-w-max">
+      {handler.lines.map((line, lineIndex) => (
+        <span
+          className="line px-4"
+          // biome-ignore lint/suspicious/noArrayIndexKey: static token array from shiki
+          key={lineIndex}
+        >
+          {line.length > 0
+            ? line.map((token, tokenIndex) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static token array from shiki
+                <TokenSpan key={tokenIndex} token={token} />
+              ))
+            : "\n"}
+        </span>
+      ))}
+    </code>
+  </div>
+);
+
+const ChatPanel = ({
+  visibleCount,
+  reaction,
+}: {
+  visibleCount: number;
+  reaction: ReactionTarget;
+}) => (
+  <div className="flex h-full flex-col overflow-hidden rounded-sm border bg-background">
+    <div className="flex items-center gap-2 border-b bg-sidebar py-2.5 pl-4 text-muted-foreground">
+      <div className="font-normal flex items-center gap-2 text-muted-foreground text-sm">
+        <HashIcon className="size-4" /> <span>general</span>
+      </div>
+    </div>
+    <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 overflow-hidden p-3">
+      <AnimatePresence mode="popLayout">
+        {MESSAGES.slice(0, visibleCount).map((msg) => (
+          <div key={msg.id}>
+            <ChatBubble message={msg} />
+            {reaction === msg.id && <ReactionBadge />}
+          </div>
+        ))}
+      </AnimatePresence>
+    </div>
+  </div>
+);
+
+const CodePanel = ({
+  activeHandler,
+  handlers,
+  header,
+  style,
+}: {
+  activeHandler: ActiveHandler;
+  handlers: SerializedHandler[];
+  header: ReactNode;
+  style: CSSProperties;
+}) => (
+  <div className="not-prose flex h-full flex-col overflow-hidden rounded-sm border">
+    {header}
+    <pre
+      className="flex-1 space-y-3 overflow-x-auto bg-background py-3 text-sm"
+      style={style}
+    >
+      {handlers.map((handler) => (
+        <HandlerBlock
+          handler={handler}
+          isActive={activeHandler === handler.key}
+          key={handler.key}
+        />
+      ))}
+    </pre>
+  </div>
+);
+
+export const DemoClient = ({
+  handlers,
+  codeHeader,
+  codeStyle,
+}: {
+  handlers: SerializedHandler[];
+  codeHeader: ReactNode;
+  codeStyle: CSSProperties;
+}) => {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const run = () => {
+      let elapsed = 0;
+      for (let i = 0; i < TIMELINE.length; i++) {
+        elapsed += TIMELINE[i].delay;
+        const idx = i;
+        timeouts.push(
+          setTimeout(() => {
+            if (idx === TIMELINE.length - 1) {
+              setStep(0);
+              timeouts.push(setTimeout(run, TIMELINE[idx].delay));
+            } else {
+              setStep(idx);
+            }
+          }, elapsed)
+        );
+      }
+    };
+
+    run();
+
+    return () => {
+      for (const t of timeouts) {
+        clearTimeout(t);
+      }
+    };
+  }, []);
+
+  const current = TIMELINE[step];
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2 lg:h-[300px]">
+      <ChatPanel
+        reaction={current.reaction}
+        visibleCount={current.visibleCount}
+      />
+      <CodePanel
+        activeHandler={current.handler}
+        handlers={handlers}
+        header={codeHeader}
+        style={codeStyle}
+      />
+    </div>
+  );
+};

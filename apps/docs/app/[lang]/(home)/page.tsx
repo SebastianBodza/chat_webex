@@ -4,6 +4,7 @@ import { Installer } from "@/components/geistdocs/installer";
 import { Button } from "@/components/ui/button";
 import { CenteredSection } from "./components/centered-section";
 import { CTA } from "./components/cta";
+import { Demo } from "./components/demo";
 import { Hero } from "./components/hero";
 import { OneTwoSection } from "./components/one-two-section";
 import { Templates } from "./components/templates";
@@ -79,10 +80,10 @@ const HomePage = () => (
     </Hero>
     <div className="grid divide-y border-y sm:border-x">
       <CenteredSection
-        description="Description of centered section"
-        title="Centered Section"
+        description="See how your handlers respond to real-time chat events across any platform."
+        title="Event-driven by design"
       >
-        <div className="aspect-video rounded-lg border bg-background" />
+        <Demo />
       </CenteredSection>
       <TextGridSection data={textGridSection} />
       <OneTwoSection
