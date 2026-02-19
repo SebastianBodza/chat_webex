@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { HashIcon } from "lucide-react";
 
@@ -322,6 +323,7 @@ export const DemoClient = ({
   codeStyle: CSSProperties;
 }) => {
   const [step, setStep] = useState(0);
+  const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
   const isVisibleRef = useRef(true);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -336,8 +338,7 @@ export const DemoClient = ({
   const run = useCallback(() => {
     clearTimeouts();
 
-    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-    const lastIdx = isDesktop ? TIMELINE.length - 1 : LAST_STEP;
+    const lastIdx = isMobile ? LAST_STEP : TIMELINE.length - 1;
 
     let elapsed = 0;
     for (let i = 0; i <= lastIdx; i++) {
@@ -349,7 +350,7 @@ export const DemoClient = ({
             return;
           }
 
-          if (isDesktop && idx === TIMELINE.length - 1) {
+          if (!isMobile && idx === TIMELINE.length - 1) {
             setStep(0);
             timeoutsRef.current.push(
               setTimeout(() => {
@@ -364,7 +365,7 @@ export const DemoClient = ({
         }, elapsed)
       );
     }
-  }, [clearTimeouts]);
+  }, [clearTimeouts, isMobile]);
 
   useEffect(() => {
     const el = containerRef.current;
