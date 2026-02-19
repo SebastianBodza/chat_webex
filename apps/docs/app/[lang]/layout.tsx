@@ -6,8 +6,6 @@ import { basePath } from "@/geistdocs";
 import { mono, sans } from "@/lib/geistdocs/fonts";
 import { cn } from "@/lib/utils";
 import { Banner } from 'fumadocs-ui/components/banner';
-import Link from "next/link";
-
 
 const Layout = async ({ children, params }: LayoutProps<"/[lang]">) => {
   const { lang } = await params;
