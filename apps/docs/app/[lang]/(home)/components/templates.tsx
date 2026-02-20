@@ -129,7 +129,7 @@ export const Templates = ({ title, description, data }: TemplatesProps) => (
           </p>
           <div
             className={cn(
-              "mt-4 -mb-8 ml-4 -mr-8 -rotate-3 overflow-hidden rounded-md border",
+              "mt-4 -mb-8 ml-4 -mr-8 -rotate-3 aspect-video overflow-hidden rounded-md border",
               "transition-transform duration-300 group-hover:-rotate-1 group-hover:scale-105"
             )}
           >

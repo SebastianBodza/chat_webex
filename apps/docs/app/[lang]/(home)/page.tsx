@@ -22,42 +22,56 @@ export const metadata: Metadata = {
 
 const templates = [
   {
-    title: "AI Chat Bot",
-    description: "Stream LLM responses with the AI SDK and post them to any platform.",
-    link: "/docs/guides/ai-chat-bot",
-    code: `bot.onNewMention(async (thread) => {
-  const result = streamText({
-    model: openai("gpt-4o"),
-    prompt: thread.messages.at(-1)?.text,
-  });
-
-  await thread.streamReply(result.textStream);
+    title: "Slack bot with Next.js",
+    description: "Build a Slack bot from scratch using Chat SDK, Next.js, and Redis.",
+    link: "/docs/guides/slack-nextjs",
+    code: `const bot = new Chat({
+  userName: "my-bot",
+  adapters: {
+    slack: createSlackAdapter({
+      botToken: process.env.SLACK_BOT_TOKEN!,
+      signingSecret: process.env.SLACK_SIGNING_SECRET!,
+    }),
+  },
+  state: createRedisState({
+    url: process.env.REDIS_URL!,
+  }),
 });`,
   },
   {
-    title: "Thread Subscriptions",
-    description: "Subscribe to threads and respond to follow-up messages automatically.",
-    link: "/docs/guides/thread-subscriptions",
+    title: "Discord support bot with Nuxt",
+    description: "Build a Discord support bot using Chat SDK, Nuxt, and AI SDK.",
+    link: "/docs/guides/discord-nuxt",
     code: `bot.onNewMention(async (thread) => {
   await thread.subscribe();
-  await thread.post("I'm listening!");
-});
-
-bot.onSubscribedMessage(async (thread, msg) => {
-  await thread.post(\`Got it: \${msg.text}\`);
+  await thread.post(
+    <Card title="Support">
+      <Text>Ask your question and
+        I'll do my best to answer.</Text>
+      <Actions>
+        <Button id="escalate">
+          Escalate to Human
+        </Button>
+      </Actions>
+    </Card>
+  );
 });`,
   },
   {
-    title: "Multi-Platform Deploy",
-    description: "Write once, deploy to Slack, Teams, and Google Chat simultaneously.",
-    link: "/docs/guides/multi-platform",
-    code: `const bot = new Chat({
-  adapters: {
-    slack: createSlackAdapter({ ... }),
-    teams: createTeamsAdapter({ ... }),
-    gchat: createGoogleChatAdapter({ ... }),
+    title: "Code review bot with Hono",
+    description: "Build a GitHub bot that reviews pull requests using AI SDK and Vercel Sandbox.",
+    link: "/docs/guides/code-review-hono",
+    code: `const sandbox = await Sandbox.create({
+  source: {
+    type: "git",
+    url: \`https://github.com/\${owner}/\${repo}\`,
+    username: "x-access-token",
+    password: process.env.GITHUB_TOKEN,
   },
-  state: createRedisState({ ... }),
+});
+
+const { tools } = await createBashTool({
+  sandbox,
 });`,
   },
 ];
@@ -96,7 +110,7 @@ const HomePage = () => (
             Get Started
           </DynamicLink>
         </Button>
-        <Installer command="pnpm add chat" />
+        <Installer command="pnpm add chat" className="w-40 sm:w-32" />
       </div>
     </Hero>
     <div className="grid divide-y border-y sm:border-x">
@@ -121,7 +135,7 @@ const HomePage = () => (
       <CTA
         cta="Get started"
         href="/docs/getting-started"
-        title="Build your first chat bot"
+        title="Ship your chatbot today"
       />
     </div>
   </div>

@@ -71,7 +71,7 @@ export const Usage = async () => {
       <div className="flex items-center gap-2 border-b bg-sidebar py-1.5 pr-1.5 pl-4 text-muted-foreground">
         <SiReact className="size-4" />
         <span className="flex-1 font-mono font-normal text-sm tracking-tight">
-          app/chat/page.tsx
+          bot.ts
         </span>
         <CopyButton code={exampleCode} />
       </div>
