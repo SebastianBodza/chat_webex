@@ -1,8 +1,5 @@
-import { MessageCircleIcon } from "lucide-react";
-
 export const Logo = () => (
   <div className="flex items-center gap-2">
-    <MessageCircleIcon className="size-5" />
     <p className="font-semibold text-xl tracking-tight">Chat SDK</p>
   </div>
 );
