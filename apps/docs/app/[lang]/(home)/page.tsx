@@ -22,22 +22,43 @@ export const metadata: Metadata = {
 
 const templates = [
   {
-    title: "Template 1",
-    description: "Description of template 1",
-    link: "https://example.com/template-1",
-    image: "https://placehold.co/600x400.png",
+    title: "AI Chat Bot",
+    description: "Stream LLM responses with the AI SDK and post them to any platform.",
+    link: "/docs/guides/ai-chat-bot",
+    code: `bot.onNewMention(async (thread) => {
+  const result = streamText({
+    model: openai("gpt-4o"),
+    prompt: thread.messages.at(-1)?.text,
+  });
+
+  await thread.streamReply(result.textStream);
+});`,
   },
   {
-    title: "Template 2",
-    description: "Description of template 2",
-    link: "https://example.com/template-2",
-    image: "https://placehold.co/600x400.png",
+    title: "Thread Subscriptions",
+    description: "Subscribe to threads and respond to follow-up messages automatically.",
+    link: "/docs/guides/thread-subscriptions",
+    code: `bot.onNewMention(async (thread) => {
+  await thread.subscribe();
+  await thread.post("I'm listening!");
+});
+
+bot.onSubscribedMessage(async (thread, msg) => {
+  await thread.post(\`Got it: \${msg.text}\`);
+});`,
   },
   {
-    title: "Template 3",
-    description: "Description of template 3",
-    link: "https://example.com/template-3",
-    image: "https://placehold.co/600x400.png",
+    title: "Multi-Platform Deploy",
+    description: "Write once, deploy to Slack, Teams, and Google Chat simultaneously.",
+    link: "/docs/guides/multi-platform",
+    code: `const bot = new Chat({
+  adapters: {
+    slack: createSlackAdapter({ ... }),
+    teams: createTeamsAdapter({ ... }),
+    gchat: createGoogleChatAdapter({ ... }),
+  },
+  state: createRedisState({ ... }),
+});`,
   },
 ];
 
@@ -94,8 +115,8 @@ const HomePage = () => (
       </OneTwoSection>
       <Templates
         data={templates}
-        description="Description of templates section"
-        title="Templates Section"
+        description="Step-by-step guides to help you build common patterns with the Chat SDK."
+        title="Guides"
       />
       <CTA
         cta="Get started"
