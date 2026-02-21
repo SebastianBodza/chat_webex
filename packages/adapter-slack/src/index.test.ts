@@ -24,7 +24,7 @@ const mockLogger: Logger = {
 function createSlackSignature(
   body: string,
   secret: string,
-  timestamp: number,
+  timestamp: number
 ): string {
   const sigBasestring = `v0:${timestamp}:${body}`;
   return `v0=${createHmac("sha256", secret).update(sigBasestring).digest("hex")}`;
@@ -33,7 +33,7 @@ function createSlackSignature(
 function createWebhookRequest(
   body: string,
   secret: string,
-  options?: { timestampOffset?: number; contentType?: string },
+  options?: { timestampOffset?: number; contentType?: string }
 ): Request {
   const timestamp =
     Math.floor(Date.now() / 1000) + (options?.timestampOffset ?? 0);
@@ -158,10 +158,10 @@ describe("decodeThreadId", () => {
     expect(() => adapter.decodeThreadId("invalid")).toThrow(ValidationError);
     expect(() => adapter.decodeThreadId("slack")).toThrow(ValidationError);
     expect(() => adapter.decodeThreadId("teams:C12345:123")).toThrow(
-      ValidationError,
+      ValidationError
     );
     expect(() => adapter.decodeThreadId("slack:A:B:C:D")).toThrow(
-      ValidationError,
+      ValidationError
     );
   });
 });
@@ -907,14 +907,16 @@ function createMockState(): StateAdapter & { cache: Map<string, unknown> } {
     acquireLock: vi.fn().mockResolvedValue(null),
     releaseLock: vi.fn().mockResolvedValue(undefined),
     extendLock: vi.fn().mockResolvedValue(true),
-    get: vi.fn().mockImplementation(async (key: string) => {
-      return cache.get(key) ?? null;
+    get: vi.fn().mockImplementation((key: string) => {
+      return Promise.resolve(cache.get(key) ?? null);
     }),
-    set: vi.fn().mockImplementation(async (key: string, value: unknown) => {
+    set: vi.fn().mockImplementation((key: string, value: unknown) => {
       cache.set(key, value);
+      return Promise.resolve();
     }),
-    delete: vi.fn().mockImplementation(async (key: string) => {
+    delete: vi.fn().mockImplementation((key: string) => {
       cache.delete(key);
+      return Promise.resolve();
     }),
   };
 }
@@ -956,7 +958,7 @@ describe("multi-workspace mode", () => {
       logger: mockLogger,
     });
     await expect(
-      adapter.setInstallation("T123", { botToken: "xoxb-token" }),
+      adapter.setInstallation("T123", { botToken: "xoxb-token" })
     ).rejects.toThrow("Adapter not initialized");
   });
 
@@ -1163,7 +1165,7 @@ describe("multi-workspace mode with encryption", () => {
         signingSecret: secret,
         logger: mockLogger,
         encryptionKey: shortKey,
-      }),
+      })
     ).toThrow("Encryption key must decode to exactly 32 bytes");
   });
 });
@@ -1205,7 +1207,7 @@ describe("handleOAuthCallback", () => {
     await adapter.initialize(createMockChatInstance(state));
 
     const request = new Request(
-      "https://example.com/auth/callback/slack?code=oauth-code-123",
+      "https://example.com/auth/callback/slack?code=oauth-code-123"
     );
     const result = await adapter.handleOAuthCallback(request);
 
@@ -1229,10 +1231,10 @@ describe("handleOAuthCallback", () => {
     await adapter.initialize(createMockChatInstance(state));
 
     const request = new Request(
-      "https://example.com/auth/callback/slack?code=test",
+      "https://example.com/auth/callback/slack?code=test"
     );
     await expect(adapter.handleOAuthCallback(request)).rejects.toThrow(
-      "clientId and clientSecret are required",
+      "clientId and clientSecret are required"
     );
   });
 });
@@ -1253,7 +1255,7 @@ describe("withBotToken", () => {
     await adapter.initialize(createMockChatInstance(state));
 
     let callbackRan = false;
-    await adapter.withBotToken("xoxb-context-token", async () => {
+    await adapter.withBotToken("xoxb-context-token", () => {
       callbackRan = true;
     });
     expect(callbackRan).toBe(true);
@@ -1274,7 +1276,7 @@ describe("withBotToken", () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         tokens.push("A");
       }),
-      adapter.withBotToken("xoxb-token-B", async () => {
+      adapter.withBotToken("xoxb-token-B", () => {
         tokens.push("B");
       }),
     ]);
@@ -1320,7 +1322,7 @@ describe("DM message handling", () => {
       adapter,
       "slack:D_DM_CHAN:",
       expect.any(Function),
-      undefined,
+      undefined
     );
   });
 
@@ -1354,7 +1356,7 @@ describe("DM message handling", () => {
       adapter,
       "slack:D_DM_CHAN:1234567890.111111",
       expect.any(Function),
-      undefined,
+      undefined
     );
   });
 

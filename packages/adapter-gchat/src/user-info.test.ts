@@ -23,14 +23,16 @@ function createMockState() {
     acquireLock: vi.fn(),
     releaseLock: vi.fn(),
     extendLock: vi.fn(),
-    get: vi.fn().mockImplementation(async (key: string) => {
-      return cache.get(key) ?? null;
+    get: vi.fn().mockImplementation((key: string) => {
+      return Promise.resolve(cache.get(key) ?? null);
     }),
-    set: vi.fn().mockImplementation(async (key: string, value: unknown) => {
+    set: vi.fn().mockImplementation((key: string, value: unknown) => {
       cache.set(key, value);
+      return Promise.resolve();
     }),
-    delete: vi.fn().mockImplementation(async (key: string) => {
+    delete: vi.fn().mockImplementation((key: string) => {
       cache.delete(key);
+      return Promise.resolve();
     }),
   } as unknown as StateAdapter & { cache: Map<string, unknown> };
 }
@@ -156,7 +158,7 @@ describe("UserInfoCache", () => {
         "users/123",
         "John Doe",
         "users/bot",
-        "chatbot",
+        "chatbot"
       );
       expect(name).toBe("John Doe");
     });
@@ -172,7 +174,7 @@ describe("UserInfoCache", () => {
         "users/123",
         "unknown",
         "users/bot",
-        "chatbot",
+        "chatbot"
       );
       expect(name).toBe("Cached Name");
     });
@@ -185,7 +187,7 @@ describe("UserInfoCache", () => {
         "users/bot",
         undefined,
         "users/bot",
-        "chatbot",
+        "chatbot"
       );
       expect(name).toBe("chatbot");
     });
@@ -200,7 +202,7 @@ describe("UserInfoCache", () => {
         "users/456",
         undefined,
         "users/bot",
-        "chatbot",
+        "chatbot"
       );
       expect(name).toBe("Cached User");
     });
@@ -213,7 +215,7 @@ describe("UserInfoCache", () => {
         "users/999",
         undefined,
         "users/bot",
-        "chatbot",
+        "chatbot"
       );
       expect(name).toBe("User 999");
     });
