@@ -21,16 +21,17 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "docs"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsup",
+    "build": "pnpm clean && tsup && cp -r ../../apps/docs/content/docs ./docs",
     "dev": "tsup --watch",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist docs"
   },
   "dependencies": {
     "@workflow/serde": "4.1.0-beta.2",
