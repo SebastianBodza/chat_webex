@@ -285,7 +285,7 @@ export interface Adapter<TThreadId = unknown, TRawMessage = unknown> {
   renderFormatted(content: FormattedContent): string;
 
   /** Show typing indicator */
-  startTyping(threadId: string): Promise<void>;
+  startTyping(threadId: string, status?: string): Promise<void>;
 
   /**
    * Stream a message using platform-native streaming APIs.
@@ -543,7 +543,7 @@ export interface Postable<
   ): Promise<void>;
 
   /** Show typing indicator */
-  startTyping(): Promise<void>;
+  startTyping(status?: string): Promise<void>;
 
   /**
    * Get the current state.
@@ -763,8 +763,9 @@ export interface Thread<TState = Record<string, unknown>, TRawMessage = unknown>
    * Show typing indicator in the thread.
    *
    * Some platforms support persistent typing indicators, others just send once.
+   * Optional status (e.g. "Typing...", "Searching documents...") is shown where supported.
    */
-  startTyping(): Promise<void>;
+  startTyping(status?: string): Promise<void>;
 
   /**
    * Subscribe to future messages in this thread.
