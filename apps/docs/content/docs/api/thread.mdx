@@ -160,6 +160,28 @@ Get a platform-specific @-mention string for a user.
 await thread.post(`Hey ${thread.mentionUser(userId)}, check this out!`);
 ```
 
+## Serialization
+
+Threads can be serialized for workflow engines and external systems. The serialized thread includes the current message if one is available.
+
+```typescript
+// Serialize
+const json = thread.toJSON();
+
+// Deserialize (requires chat.registerSingleton() or bot.reviver())
+const data = JSON.parse(payload, bot.reviver());
+await data.thread.post("Hello from workflow!");
+```
+
+The serialized format includes the thread ID, channel ID, adapter name, DM status, and the current message (if present). The `reviver()` method on the `Chat` instance handles deserialization of both `Thread` and `Message` objects.
+
+```typescript
+// Pass to a workflow
+await workflow.start("my-workflow", {
+  thread: thread.toJSON(),
+});
+```
+
 ## SentMessage
 
 Returned by `thread.post()`. Extends `Message` with mutation methods.
