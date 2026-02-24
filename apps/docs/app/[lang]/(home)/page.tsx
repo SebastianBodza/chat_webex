@@ -28,14 +28,9 @@ const templates = [
     code: `const bot = new Chat({
   userName: "my-bot",
   adapters: {
-    slack: createSlackAdapter({
-      botToken: process.env.SLACK_BOT_TOKEN!,
-      signingSecret: process.env.SLACK_SIGNING_SECRET!,
-    }),
+    slack: createSlackAdapter(),
   },
-  state: createRedisState({
-    url: process.env.REDIS_URL!,
-  }),
+  state: createRedisState(),
 });`,
   },
   {
