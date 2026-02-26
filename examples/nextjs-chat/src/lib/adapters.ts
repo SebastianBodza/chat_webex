@@ -10,6 +10,10 @@ import { createGitHubAdapter, type GitHubAdapter } from "@chat-adapter/github";
 import { createLinearAdapter, type LinearAdapter } from "@chat-adapter/linear";
 import { createSlackAdapter, type SlackAdapter } from "@chat-adapter/slack";
 import { createTeamsAdapter, type TeamsAdapter } from "@chat-adapter/teams";
+import {
+  createTelegramAdapter,
+  type TelegramAdapter,
+} from "@chat-adapter/telegram";
 import { ConsoleLogger } from "chat";
 import { recorder, withRecording } from "./recorder";
 
@@ -23,6 +27,7 @@ export interface Adapters {
   linear?: LinearAdapter;
   slack?: SlackAdapter;
   teams?: TeamsAdapter;
+  telegram?: TelegramAdapter;
 }
 
 // Methods to record for each adapter (outgoing API calls)
@@ -81,6 +86,16 @@ const LINEAR_METHODS = [
   "addReaction",
   "fetchMessages",
 ];
+const TELEGRAM_METHODS = [
+  "postMessage",
+  "editMessage",
+  "deleteMessage",
+  "addReaction",
+  "removeReaction",
+  "startTyping",
+  "openDM",
+  "fetchMessages",
+];
 
 /**
  * Build type-safe adapters based on available environment variables.
@@ -90,7 +105,7 @@ const LINEAR_METHODS = [
  * (like userName and appType) need to be provided explicitly.
  */
 export function buildAdapters(): Adapters {
-  // Start fetch recording to capture all Graph/Slack/GChat API calls
+  // Start fetch recording to capture outgoing adapter API calls
   recorder.startFetchRecording();
 
   const adapters: Adapters = {};
@@ -185,6 +200,17 @@ export function buildAdapters(): Adapters {
         "[chat] Failed to create linear adapter (check LINEAR_API_KEY or LINEAR_CLIENT_ID/SECRET)"
       );
     }
+  }
+
+  // Telegram adapter (optional) - env vars: TELEGRAM_BOT_TOKEN
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    adapters.telegram = withRecording(
+      createTelegramAdapter({
+        logger: logger.child("telegram"),
+      }),
+      "telegram",
+      TELEGRAM_METHODS
+    );
   }
 
   return adapters;

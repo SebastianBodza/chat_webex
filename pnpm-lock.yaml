@@ -192,6 +192,9 @@ importers:
       '@chat-adapter/teams':
         specifier: workspace:*
         version: link:../../packages/adapter-teams
+      '@chat-adapter/telegram':
+        specifier: workspace:*
+        version: link:../../packages/adapter-telegram
       ai:
         specifier: ^6.0.5
         version: 6.0.6(zod@4.3.3)
@@ -414,6 +417,28 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.3)(lightningcss@1.30.2)
 
+  packages/adapter-telegram:
+    dependencies:
+      '@chat-adapter/shared':
+        specifier: workspace:*
+        version: link:../adapter-shared
+      chat:
+        specifier: workspace:*
+        version: link:../chat
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      tsup:
+        specifier: ^8.3.5
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.3)(lightningcss@1.30.2)
+
   packages/chat:
     dependencies:
       '@workflow/serde':
@@ -468,6 +493,9 @@ importers:
       '@chat-adapter/teams':
         specifier: workspace:*
         version: link:../adapter-teams
+      '@chat-adapter/telegram':
+        specifier: workspace:*
+        version: link:../adapter-telegram
       chat:
         specifier: workspace:*
         version: link:../chat

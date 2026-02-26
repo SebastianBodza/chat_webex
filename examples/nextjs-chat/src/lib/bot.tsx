@@ -567,7 +567,7 @@ bot.onNewMessage(/help/i, async (thread, message) => {
 
 // Handle messages in subscribed threads
 bot.onSubscribedMessage(async (thread, message) => {
-  if (!message.isMention) {
+  if (!(thread.adapter.name === "telegram" || message.isMention)) {
     return;
   }
   // Get thread state to check AI mode
@@ -601,7 +601,6 @@ bot.onSubscribedMessage(async (thread, message) => {
       messages = thread.recentMessages;
     }
     const history = [...messages]
-      .reverse()
       .filter((msg) => msg.text.trim()) // Filter out empty messages (cards, system msgs)
       .map((msg) => ({
         role: msg.author.isMe ? ("assistant" as const) : ("user" as const),

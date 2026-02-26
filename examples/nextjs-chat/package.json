@@ -17,6 +17,7 @@
     "@chat-adapter/linear": "workspace:*",
     "@chat-adapter/slack": "workspace:*",
     "@chat-adapter/state-redis": "workspace:*",
+    "@chat-adapter/telegram": "workspace:*",
     "@chat-adapter/teams": "workspace:*",
     "ai": "^6.0.5",
     "chat": "workspace:*",
