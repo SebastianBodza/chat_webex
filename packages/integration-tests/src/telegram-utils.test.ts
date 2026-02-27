@@ -22,7 +22,11 @@ describe("createMockTelegramApi", () => {
 
   it("clearMocks resets calls and sentMessages", () => {
     const api = createMockTelegramApi();
-    api.calls.push({ method: "getMe", payload: {}, url: "https://example.com" });
+    api.calls.push({
+      method: "getMe",
+      payload: {},
+      url: "https://example.com",
+    });
     api.sentMessages.push({ chatId: 1, messageId: 1, text: "hi" });
 
     api.clearMocks();
@@ -326,18 +330,15 @@ describe("setupTelegramFetchMock", () => {
 
   it("parses URL input as Request object", async () => {
     await fetch(
-      new Request(
-        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`
-      )
+      new Request(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`)
     );
     expect(mockApi.calls[0].method).toBe("getMe");
   });
 
   it("handles request with no body", async () => {
-    await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`,
-      { method: "GET" }
-    );
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`, {
+      method: "GET",
+    });
 
     expect(mockApi.calls[0].payload).toEqual({});
   });
@@ -380,10 +381,10 @@ describe("setupTelegramFetchMock", () => {
     form.set("chat_id", "789");
     form.set("photo", new Blob(["fake-image"]), "photo.jpg");
 
-    await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`,
-      { method: "POST", body: form }
-    );
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+      method: "POST",
+      body: form,
+    });
 
     expect(mockApi.calls[0].payload.photo).toBe("[binary]");
   });
