@@ -25,14 +25,14 @@
     "fix": "ultracite fix"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.0",
+    "@biomejs/biome": "^2.4.4",
     "@changesets/cli": "^2.29.8",
-    "@vitest/coverage-v8": "^2.1.8",
-    "knip": "^5.78.0",
-    "turbo": "^2.3.0",
-    "typescript": "^5.7.2",
-    "ultracite": "7.2.3",
-    "vitest": "^2.1.8"
+    "@vitest/coverage-v8": "^4.0.18",
+    "knip": "^5.85.0",
+    "turbo": "^2.8.12",
+    "typescript": "^5.9.3",
+    "ultracite": "7.2.4",
+    "vitest": "^4.0.18"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@10.30.3"
 }
