@@ -1,0 +1,136 @@
+---
+title: Webex
+description: Configure the Webex adapter using a Webex Bot token and webhook subscriptions.
+type: integration
+prerequisites:
+  - /docs/getting-started
+  - /docs/adapters/index
+---
+
+## Installation
+
+```sh title="Terminal"
+pnpm add @chat-adapter/webex
+```
+
+## Usage
+
+The adapter auto-detects `WEBEX_BOT_TOKEN`, `WEBEX_WEBHOOK_SECRET`, `WEBEX_BASE_URL`, and `WEBEX_BOT_USERNAME` from environment variables.
+
+```typescript title="lib/bot.ts" lineNumbers
+import { Chat } from "chat";
+import { createWebexAdapter } from "@chat-adapter/webex";
+
+const bot = new Chat({
+  userName: "mybot",
+  adapters: {
+    webex: createWebexAdapter(),
+  },
+});
+
+bot.onNewMention(async (thread) => {
+  await thread.post("Hello from Webex!");
+});
+```
+
+## Webex setup
+
+### 1. Create a bot in Webex Developer Portal
+
+1. Go to [developer.webex.com](https://developer.webex.com).
+2. Open **My Webex Apps**.
+3. Create a new **Bot** app.
+4. Copy the bot access token and store it as `WEBEX_BOT_TOKEN`.
+
+### 2. Subscribe webhooks
+
+Create webhooks that point to your adapter endpoint, for example:
+`https://your-domain.com/api/webhooks/webex`
+
+Required webhook subscriptions:
+
+1. `resource=messages`, `event=created`
+2. `resource=attachmentActions`, `event=created` (for button/card submit actions)
+
+Example request:
+
+```bash title="Terminal"
+curl --request POST https://webexapis.com/v1/webhooks \
+  --header "Authorization: Bearer $WEBEX_BOT_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "name": "Webex Messages",
+    "targetUrl": "https://your-domain.com/api/webhooks/webex",
+    "resource": "messages",
+    "event": "created",
+    "secret": "'"$WEBEX_WEBHOOK_SECRET"'"
+  }'
+```
+
+If you set a webhook `secret`, set the same value in `WEBEX_WEBHOOK_SECRET` so signature verification succeeds.
+
+### 3. Add the bot to target spaces
+
+Invite the bot to spaces where it should receive and post messages.
+
+## Configuration
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `botToken` | Yes* | Bot token used for Webex REST API calls. Auto-detected from `WEBEX_BOT_TOKEN` |
+| `webhookSecret` | No | Shared secret for `X-Spark-Signature` validation. Auto-detected from `WEBEX_WEBHOOK_SECRET` |
+| `baseUrl` | No | Webex API base URL (default: `https://webexapis.com/v1`) |
+| `botUserId` | No | Optional bot person ID override. Otherwise fetched via `/people/me` |
+| `userName` | No | Optional bot mention name override |
+| `logger` | No | Logger instance (defaults to `ConsoleLogger("info").child("webex")`) |
+
+*Required via config or `WEBEX_BOT_TOKEN`.
+
+## Environment variables
+
+```bash title=".env.local"
+WEBEX_BOT_TOKEN=...
+WEBEX_WEBHOOK_SECRET=...      # Recommended
+WEBEX_BASE_URL=...            # Optional
+WEBEX_BOT_USERNAME=...        # Optional
+```
+
+## Features
+
+| Feature | Supported |
+|---------|-----------|
+| Mentions | Yes |
+| Cards (Adaptive Cards) | Yes |
+| Card button actions | Yes (`attachmentActions.created`) |
+| File uploads | Yes |
+| DMs | Yes (`openDM`, via `toPersonId`) |
+| Post/edit/delete messages | Yes |
+| Message history | Yes |
+| Channel listing/thread listing | Yes |
+| Fetch single message | Yes |
+| Modal events | Yes (card-backed modal bridge via `openModal`) |
+| Reactions (add/remove) | Yes (requires reactions enabled in org) |
+| Typing indicator | No |
+
+## Limitations
+
+- Reactions require the feature to be enabled in your Webex organization. Some enterprise deployments disable them.
+- Webex has no typing indicator REST endpoint for bots; `startTyping()` is a no-op.
+- Webhook handling currently targets `messages.created` and `attachmentActions.created`.
+- DM thread IDs are virtual until the first outbound DM message creates/resolves the underlying direct room.
+- The adapter caps card actions at 20 per message attachment to stay within Adaptive Card limits.
+
+## Implementation notes
+
+- Thread IDs are encoded as `webex:{base64url(roomId)}:{base64url(rootMessageId)}`.
+- Channel IDs are encoded as `webex:{base64url(roomId)}`.
+- Sensitive webhook payload data is resolved by fetching the full resource (`/messages/{id}` and `/attachment/actions/{id}`).
+
+## Information needed for live end-to-end validation
+
+To run production-like integration tests against your Webex org, you need:
+
+1. Bot token (`WEBEX_BOT_TOKEN`)
+2. Webhook secret (`WEBEX_WEBHOOK_SECRET`) and a reachable webhook URL
+3. At least one test space ID and one test user/person ID for DM flow validation
+4. Confirmation whether commercial Webex or FedRAMP Webex for Government is required

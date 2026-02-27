@@ -1,5 +1,6 @@
 /** @jsxImportSource chat */
 // @ts-nocheck - TypeScript doesn't understand custom JSX runtimes with per-file pragmas
+import { createMemoryState } from "@chat-adapter/state-memory";
 import { createRedisState } from "@chat-adapter/state-redis";
 import { ToolLoopAgent } from "ai";
 import {
@@ -27,11 +28,24 @@ const AI_MENTION_REGEX = /\bAI\b/i;
 const DISABLE_AI_REGEX = /disable\s*AI/i;
 const ENABLE_AI_REGEX = /enable\s*AI/i;
 const DM_ME_REGEX = /^dm\s*me$/i;
+const WEBEX_ADAPTER_NAME = "webex";
 
-const state = createRedisState({
-  url: process.env.REDIS_URL || "",
-  keyPrefix: "chat-sdk-webhooks",
-});
+function isWebexAdapter(adapterName: string): boolean {
+  return adapterName === WEBEX_ADAPTER_NAME;
+}
+
+const state = process.env.REDIS_URL
+  ? createRedisState({
+      url: process.env.REDIS_URL,
+      keyPrefix: "chat-sdk-webhooks",
+    })
+  : createMemoryState();
+
+if (!process.env.REDIS_URL) {
+  console.warn(
+    "[chat] REDIS_URL is not set; using in-memory state (state resets on restart)"
+  );
+}
 const adapters = buildAdapters();
 
 // Define thread state type
@@ -57,6 +71,7 @@ const agent = new ToolLoopAgent({
 // Handle new @mentions of the bot
 bot.onNewMention(async (thread, message) => {
   await thread.subscribe();
+  const isWebex = isWebexAdapter(thread.adapter.name);
 
   // Check if user wants to enable AI mode (mention contains "AI")
   if (AI_MENTION_REGEX.test(message.text)) {
@@ -103,31 +118,62 @@ bot.onNewMention(async (thread, message) => {
         <Field label="Platform" value={thread.adapter.name} />
       </Fields>
       <Divider />
-      <Actions>
-        <Select id="quick_action" label="Quick Action" placeholder="Choose...">
-          <SelectOption label="Say Hello" value="greet" />
-          <SelectOption label="Show Info" value="info" />
-          <SelectOption label="Get Help" value="help" />
-        </Select>
-        <Button id="hello" style="primary">
-          Say Hello
-        </Button>
-        <Button id="ephemeral">Ephemeral response</Button>
-        <Button id="info">Show Info</Button>
-        <Button id="choose_plan">Choose Plan</Button>
-        <Button id="feedback">Send Feedback</Button>
-        <Button id="messages">Fetch Messages</Button>
-        <Button id="channel-post">Channel Post</Button>
-        <Button id="report" value="bug">
-          Report Bug
-        </Button>
-        <LinkButton url="https://vercel.com">Open Link</LinkButton>
-        <Button id="goodbye" style="danger">
-          Goodbye
-        </Button>
-      </Actions>
+      {isWebex ? (
+        <Actions>
+          <Button id="hello" style="primary">
+            Say Hello
+          </Button>
+          <Button id="info">Show Info</Button>
+          <Button id="choose_plan">Choose Plan</Button>
+          <Button id="feedback">Send Feedback</Button>
+          <Button id="ephemeral">Ephemeral response</Button>
+        </Actions>
+      ) : (
+        <Actions>
+          <Select id="quick_action" label="Quick Action" placeholder="Choose...">
+            <SelectOption label="Say Hello" value="greet" />
+            <SelectOption label="Show Info" value="info" />
+            <SelectOption label="Get Help" value="help" />
+          </Select>
+          <Button id="hello" style="primary">
+            Say Hello
+          </Button>
+          <Button id="info">Show Info</Button>
+          <Button id="choose_plan">Choose Plan</Button>
+          <Button id="feedback">Send Feedback</Button>
+          <Button id="ephemeral">Ephemeral response</Button>
+          <Button id="messages">Fetch Messages</Button>
+          <Button id="channel-post">Channel Post</Button>
+          <Button id="report" value="bug">
+            Report Bug
+          </Button>
+          <LinkButton url="https://vercel.com">Open Link</LinkButton>
+          <Button id="goodbye" style="danger">
+            Goodbye
+          </Button>
+        </Actions>
+      )}
     </Card>
   );
+
+  if (isWebex) {
+    await thread.post(
+      <Card title={`${emoji.memo} More Actions`}>
+        <Text>Additional demo actions for Webex:</Text>
+        <Actions>
+          <Button id="messages">Fetch Messages</Button>
+          <Button id="channel-post">Channel Post</Button>
+          <Button id="report" value="bug">
+            Report Bug
+          </Button>
+          <LinkButton url="https://vercel.com">Open Link</LinkButton>
+          <Button id="goodbye" style="danger">
+            Goodbye
+          </Button>
+        </Actions>
+      </Card>
+    );
+  }
 });
 
 bot.onAction("ephemeral", async (event) => {
@@ -149,7 +195,7 @@ bot.onAction("ephemeral", async (event) => {
 });
 
 bot.onAction("ephemeral_modal", async (event) => {
-  await event.openModal(
+  const result = await event.openModal(
     <Modal
       callbackId="ephemeral_modal_form"
       closeLabel="Cancel"
@@ -163,6 +209,11 @@ bot.onAction("ephemeral_modal", async (event) => {
       />
     </Modal>
   );
+  if (!result) {
+    await event.thread.post(
+      `${emoji.info} Modal dialogs are not supported by ${event.adapter.name}.`
+    );
+  }
 });
 
 bot.onModalSubmit("ephemeral_modal_form", async (event) => {
@@ -219,6 +270,7 @@ bot.onAction("choose_plan", (event) => {
     </Card>
   );
 });
+
 bot.onAction("plan_selected", (event) => {
   event.thread.post(
     <Card title={`${emoji.check} Plan Chosen!`}>
@@ -230,6 +282,17 @@ bot.onAction("plan_selected", (event) => {
 // Handle card button actions
 bot.onAction("hello", async (event) => {
   await event.thread.post(`${emoji.wave} Hello, ${event.user.fullName}!`);
+});
+
+// Handle emoji reaction button
+bot.onAction("react", async (event) => {
+  const emojiName = event.value || "thumbsup";
+  try {
+    await event.adapter.addReaction(event.threadId, event.messageId, emojiName);
+  } catch (error) {
+    // Reactions may not be available in all orgs; avoid noisy fallback messages.
+    console.warn("Could not add reaction:", error);
+  }
 });
 
 bot.onAction("info", async (event) => {
@@ -288,7 +351,12 @@ const FeedbackModal = (
 
 // Open feedback modal
 bot.onAction("feedback", async (event) => {
-  await event.openModal(FeedbackModal);
+  const result = await event.openModal(FeedbackModal);
+  if (!result) {
+    await event.thread.post(
+      `${emoji.info} Modal dialogs are not supported by ${event.adapter.name}.`
+    );
+  }
 });
 
 // Opens feedback modal via /feedback
@@ -303,7 +371,7 @@ bot.onSlashCommand("/test-feedback", async (event) => {
 
 // Open bug report modal with privateMetadata carrying context from button value
 bot.onAction("report", async (event) => {
-  await event.openModal(
+  const result = await event.openModal(
     <Modal
       callbackId="report_form"
       privateMetadata={JSON.stringify({
@@ -333,6 +401,11 @@ bot.onAction("report", async (event) => {
       </Select>
     </Modal>
   );
+  if (!result) {
+    await event.thread.post(
+      `${emoji.info} Modal dialogs are not supported by ${event.adapter.name}.`
+    );
+  }
 });
 
 // Handle bug report modal — reads context from privateMetadata
@@ -384,10 +457,20 @@ bot.onModalSubmit("feedback_form", async (event) => {
     email,
     user: event.user.userName,
   });
-  await event.relatedMessage?.edit(`${emoji.check} **Feedback received!**`);
+
+  if (!isWebexAdapter(event.adapter.name)) {
+    try {
+      await event.relatedMessage?.edit(`${emoji.check} **Feedback received!**`);
+    } catch (err) {
+      console.warn("Could not edit related message after feedback submit", {
+        adapter: event.adapter.name,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   const target = event.relatedChannel || event.relatedThread;
-  await target?.postEphemeral(
-    event.user,
+  const confirmationCard = (
     <Card title={`${emoji.check} Feedback received!`}>
       <Text>Thank you for your feedback!</Text>
       <Fields>
@@ -396,9 +479,24 @@ bot.onModalSubmit("feedback_form", async (event) => {
         <Field label="Message" value={message} />
         <Field label="Email" value={email} />
       </Fields>
-    </Card>,
-    { fallbackToDM: false }
+    </Card>
   );
+
+  if (!target) {
+    return;
+  }
+
+  const ephemeralResult = await target.postEphemeral(
+    event.user,
+    confirmationCard,
+    { fallbackToDM: true }
+  );
+
+  // If a platform cannot send native ephemeral or fallback DM failed,
+  // still ensure the user sees a confirmation.
+  if (!ephemeralResult) {
+    await target.post(confirmationCard);
+  }
 });
 
 // Handle modal close (cancel)
@@ -670,9 +768,13 @@ bot.onReaction(["thumbs_up", "heart", "fire", "rocket"], async (event) => {
     return;
   }
 
-  // GChat and Teams bots cannot add reactions via their APIs
+  // GChat, Teams, and Webex adapters do not support adding reactions
   // Respond with a message instead
-  if (event.adapter.name === "gchat" || event.adapter.name === "teams") {
+  if (
+    event.adapter.name === "gchat" ||
+    event.adapter.name === "teams" ||
+    event.adapter.name === "webex"
+  ) {
     await event.adapter.postMessage(
       event.threadId,
       `Thanks for the ${event.rawEmoji}!`

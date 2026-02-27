@@ -27,6 +27,9 @@ export default function Home() {
         <li>
           <code>/api/webhooks/linear</code> - Linear issue comment events
         </li>
+        <li>
+          <code>/api/webhooks/webex</code> - Webex message and card events
+        </li>
       </ul>
 
       <h2>Features</h2>
@@ -95,6 +98,15 @@ GITHUB_WEBHOOK_SECRET=...`}
         {`LINEAR_API_KEY=lin_api_...
 LINEAR_WEBHOOK_SECRET=...`}
       </pre>
+
+      <h3>Webex</h3>
+      <pre>
+        {`WEBEX_BOT_TOKEN=...
+WEBEX_WEBHOOK_SECRET=...
+`}
+      </pre>
     </main>
   );
 }
+
+

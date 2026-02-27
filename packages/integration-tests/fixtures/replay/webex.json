@@ -1,0 +1,30 @@
+{
+  "botName": "Chat SDK Webex Bot",
+  "botUserId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9ib3QtdXNlci0xMjM",
+  "mention": {
+    "id": "webhook-event-mention",
+    "resource": "messages",
+    "event": "created",
+    "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
+    "data": {
+      "id": "Y2lzY29zcGFyazovL3VzL01FU1NBR0UvbWVudGlvbi0x",
+      "roomId": "Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbS0xMjM",
+      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
+      "personEmail": "user@example.com",
+      "created": "2026-02-28T10:00:00.000Z"
+    }
+  },
+  "followUp": {
+    "id": "webhook-event-followup",
+    "resource": "messages",
+    "event": "created",
+    "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
+    "data": {
+      "id": "Y2lzY29zcGFyazovL3VzL01FU1NBR0UvZm9sbG93dXAtMQ",
+      "roomId": "Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbS0xMjM",
+      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
+      "personEmail": "user@example.com",
+      "created": "2026-02-28T10:01:00.000Z"
+    }
+  }
+}

@@ -14,8 +14,11 @@ import {
   createTelegramAdapter,
   type TelegramAdapter,
 } from "@chat-adapter/telegram";
+import { createWebexAdapter } from "@chat-adapter/webex";
 import { ConsoleLogger } from "chat";
 import { recorder, withRecording } from "./recorder";
+
+type WebexAdapter = ReturnType<typeof createWebexAdapter>;
 
 // Create a shared logger for adapters that need explicit logger overrides
 const logger = new ConsoleLogger("info");
@@ -28,6 +31,7 @@ export interface Adapters {
   slack?: SlackAdapter;
   teams?: TeamsAdapter;
   telegram?: TelegramAdapter;
+  webex?: WebexAdapter;
 }
 
 // Methods to record for each adapter (outgoing API calls)
@@ -95,6 +99,19 @@ const TELEGRAM_METHODS = [
   "startTyping",
   "openDM",
   "fetchMessages",
+];
+const WEBEX_METHODS = [
+  "postMessage",
+  "postChannelMessage",
+  "editMessage",
+  "deleteMessage",
+  "addReaction",
+  "removeReaction",
+  "startTyping",
+  "openDM",
+  "fetchMessages",
+  "fetchChannelMessages",
+  "listThreads",
 ];
 
 /**
@@ -210,6 +227,21 @@ export function buildAdapters(): Adapters {
       }),
       "telegram",
       TELEGRAM_METHODS
+    );
+  }
+
+  // Webex adapter (optional) - env vars: WEBEX_BOT_TOKEN (+ WEBEX_WEBHOOK_SECRET recommended)
+  if (process.env.WEBEX_BOT_TOKEN) {
+    console.log(
+      "[chat] Creating Webex adapter (ensure WEBEX_WEBHOOK_SECRET is set for security)"
+    );
+    adapters.webex = withRecording(
+      createWebexAdapter({
+        userName: "Chat SDK Bot",
+        logger: logger.child("webex"),
+      }),
+      "webex",
+      WEBEX_METHODS
     );
   }
 

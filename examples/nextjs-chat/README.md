@@ -8,7 +8,6 @@ A full-featured example app demonstrating the Chat SDK with Next.js. Integrates 
 
 - Node.js 20+
 - pnpm 9+
-- Redis (for state persistence)
 - At least one platform configured (see [Environment variables](#environment-variables))
 
 ### Setup
@@ -34,6 +33,24 @@ pnpm dev
 The app runs at `http://localhost:3000`. Platform webhooks should point to `/api/webhooks/{platform}` (e.g. `/api/webhooks/slack`).
 
 > For local development with real webhooks, use a tunneling tool like [ngrok](https://ngrok.com) or [`localtunnel`](https://github.com/localtunnel/localtunnel).
+
+### Register Webex webhooks (optional)
+
+If you're using Webex, you can register the required webhooks automatically:
+
+```bash
+pnpm --filter example-nextjs-chat webex:webhooks https://your-ngrok-url.ngrok-free.app
+```
+
+This upserts:
+
+- `messages.created`
+- `attachmentActions.created`
+
+Required environment variables:
+
+- `WEBEX_BOT_TOKEN`
+- `WEBEX_WEBHOOK_SECRET`
 
 ## What it demonstrates
 
@@ -80,9 +97,12 @@ Copy `.env.example` for the full list. At minimum, set `BOT_USERNAME` and creden
 | `GOOGLE_CHAT_CREDENTIALS` | Google Chat service account JSON |
 | `DISCORD_BOT_TOKEN` | Discord bot token |
 | `DISCORD_PUBLIC_KEY` | Discord interaction verification key |
+| `WEBEX_BOT_TOKEN` | Webex bot token |
+| `WEBEX_WEBHOOK_SECRET` | Webex webhook signature secret |
+| `WEBEX_WEBHOOK_BASE_URL` | Public base URL for webhook registration script |
 | `GITHUB_TOKEN` | GitHub PAT or App credentials |
 | `LINEAR_API_KEY` | Linear API key |
-| `REDIS_URL` | Redis connection string |
+| `REDIS_URL` | Optional Redis connection string (falls back to in-memory state) |
 
 See the [Chat SDK docs](https://chat-sdk.dev/docs) for full platform setup guides.
 

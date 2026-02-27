@@ -95,6 +95,7 @@ const DEFAULT_FETCH_URL_PATTERNS: RegExp[] = [
   /graph\.microsoft\.com/,
   /\.slack\.com/,
   /chat\.googleapis\.com/,
+  /webexapis\.com/,
 ];
 
 class Recorder {

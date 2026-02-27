@@ -24,7 +24,7 @@ session-{SHA}-{timestamp}-{random}
 
 Perform the interactions you want to test:
 
-- @mention the bot in Slack, Teams, or Google Chat
+- @mention the bot in Slack, Teams, Google Chat, or Webex
 - Click buttons in cards (actions)
 - Add emoji reactions
 - Send follow-up messages
@@ -80,6 +80,9 @@ cat /tmp/recording.json | jq '[.[] | select(.type == "webhook" and .platform == 
 
 # Extract Teams webhooks
 cat /tmp/recording.json | jq '[.[] | select(.type == "webhook" and .platform == "teams") | .body | fromjson]'
+
+# Extract Webex webhooks
+cat /tmp/recording.json | jq '[.[] | select(.type == "webhook" and .platform == "webex") | .body | fromjson]'
 ```
 
 ### 7. Create fixture file
@@ -104,6 +107,7 @@ Create a JSON file in the appropriate fixtures directory:
 See existing tests for examples:
 
 - `replay.test.ts` - Basic mention and follow-up messaging
+- `replay-webex.test.ts` - Basic Webex mention and follow-up messaging
 - `replay-actions-reactions.test.ts` - Button clicks and emoji reactions
 - `replay-dm.test.ts` - Direct message flows
 
@@ -111,23 +115,24 @@ See existing tests for examples:
 
 ```
 fixtures/replay/
-├── README.md
-├── slack.json           # Basic Slack messaging
-├── gchat.json           # Basic Google Chat messaging
-├── teams.json           # Basic Teams messaging
-├── actions-reactions/   # Button clicks and reactions
-│   ├── slack.json
-│   ├── gchat.json
-│   └── teams.json
-└── dm/                  # Direct message flows
-    ├── slack.json
-    ├── gchat.json
-    └── teams.json
+|- README.md
+|- slack.json           # Basic Slack messaging
+|- gchat.json           # Basic Google Chat messaging
+|- teams.json           # Basic Teams messaging
+|- webex.json           # Basic Webex messaging
+|- actions-reactions/   # Button clicks and reactions
+|  |- slack.json
+|  |- gchat.json
+|  `- teams.json
+`- dm/                  # Direct message flows
+   |- slack.json
+   |- gchat.json
+   `- teams.json
 ```
 
 ## Fixture Formats
 
-### Basic messaging (`slack.json`, `gchat.json`, `teams.json`)
+### Basic messaging (`slack.json`, `gchat.json`, `teams.json`, `webex.json`)
 
 ```json
 {
@@ -216,16 +221,85 @@ Raw emoji format: Slack shortcode without colons (e.g., `+1`, `heart`)
 
 Raw emoji format: Teams reaction type (e.g., `like`, `heart`)
 
-## Recording Implementation Details
+### Webex
 
-The recorder (`examples/nextjs-chat/src/lib/recorder.ts`) stores entries in Redis:
+| Event     | Format                                              |
+| --------- | --------------------------------------------------- |
+| Mention   | `resource: "messages"`, `event: "created"`          |
+| Follow-up | `resource: "messages"`, `event: "created"`          |
+| Action    | `resource: "attachmentActions"`, `event: "created"` |
+| DM        | Message with `roomType: "direct"`                   |
 
-- Key: `recording:{sessionId}`
-- TTL: 24 hours
-- Entry types: `webhook` (incoming) and `api-call` (outgoing)
+Notes:
 
-Session ID format when `VERCEL_GIT_COMMIT_SHA` is set:
+- Webex message webhooks contain envelope metadata only; fetch full message via `GET /messages/{id}`.
+- Card submit actions arrive through `attachmentActions`; fetch details via `GET /attachment/actions/{id}`.
+- Signature validation uses `x-spark-signature` with your webhook secret.
 
+## Generating Webex Replay Fixtures (Tutorial)
+
+### 1. Configure environment in `examples/nextjs-chat/.env.local`
+
+```bash
+RECORDING_ENABLED=true
+REDIS_URL=redis://...
+WEBEX_BOT_TOKEN=...
+WEBEX_WEBHOOK_SECRET=...
+```
+
+### 2. Start local app and public tunnel
+
+```bash
+pnpm --filter example-nextjs-chat dev
+ngrok http 3000
+```
+
+### 3. Register Webex webhooks
+
+```bash
+pnpm --filter example-nextjs-chat webex:webhooks https://<your-ngrok-subdomain>.ngrok-free.app
+```
+
+This upserts:
+
+- `messages.created`
+- `attachmentActions.created`
+
+### 4. Trigger flows in Webex
+
+- Mention the bot in a group space (or DM it directly)
+- Send follow-up messages
+- Click card actions (buttons/selects)
+
+### 5. Export a recording session
+
+```bash
+cd examples/nextjs-chat
+pnpm recording:list
+pnpm recording:export <session-id> 2>&1 | \
+  grep -v "^>" | grep -v "^\[dotenv" | grep -v "^$" > /tmp/webex-recording.json
+```
+
+### 6. Extract Webex webhook payloads
+
+```bash
+cat /tmp/webex-recording.json | jq '[.[] | select(.type == "webhook" and .platform == "webex") | .body | fromjson]'
+```
+
+### 7. Build `fixtures/replay/
+|- README.md
+|- slack.json           # Basic Slack messaging
+|- gchat.json           # Basic Google Chat messaging
+|- teams.json           # Basic Teams messaging
+|- webex.json           # Basic Webex messaging
+|- actions-reactions/   # Button clicks and reactions
+|  |- slack.json
+|  |- gchat.json
+|  `- teams.json
+`- dm/                  # Direct message flows
+   |- slack.json
+   |- gchat.json
+   `- teams.json
 ```
 session-{SHA}-{ISO timestamp}-{random 6 chars}
 ```
