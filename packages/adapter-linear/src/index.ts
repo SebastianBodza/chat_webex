@@ -627,7 +627,7 @@ export class LinearAdapter
     return {
       messages,
       nextCursor: commentsConnection.pageInfo.hasNextPage
-        ? commentsConnection.pageInfo.endCursor
+        ? (commentsConnection.pageInfo.endCursor ?? undefined)
         : undefined,
     };
   }
@@ -666,7 +666,7 @@ export class LinearAdapter
     return {
       messages: [...rootMessages, ...childMessages],
       nextCursor: childrenConnection.pageInfo.hasNextPage
-        ? childrenConnection.pageInfo.endCursor
+        ? (childrenConnection.pageInfo.endCursor ?? undefined)
         : undefined,
     };
   }
