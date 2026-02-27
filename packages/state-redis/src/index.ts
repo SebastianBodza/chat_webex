@@ -60,7 +60,7 @@ export class RedisStateAdapter implements StateAdapter {
 
   async disconnect(): Promise<void> {
     if (this.connected) {
-      await this.client.quit();
+      await this.client.close();
       this.connected = false;
       this.connectPromise = null;
     }
@@ -78,7 +78,11 @@ export class RedisStateAdapter implements StateAdapter {
 
   async isSubscribed(threadId: string): Promise<boolean> {
     this.ensureConnected();
-    return this.client.sIsMember(this.subscriptionsSetKey(), threadId);
+    const result = await this.client.sIsMember(
+      this.subscriptionsSetKey(),
+      threadId
+    );
+    return result === 1;
   }
 
   async acquireLock(threadId: string, ttlMs: number): Promise<Lock | null> {
