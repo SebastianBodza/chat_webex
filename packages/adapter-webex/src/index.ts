@@ -49,10 +49,8 @@ import {
 import type {
   WebexAttachmentAction,
   WebexListMessagesResponse,
-  WebexListReactionsResponse,
   WebexMessage,
   WebexPerson,
-  WebexReaction,
   WebexRoom,
   WebexThreadId,
   WebexWebhookPayload,
@@ -67,42 +65,6 @@ const MAX_WEBEX_PAGE_SIZE = 100;
 const WEBEX_PREFIX = "webex";
 const WEBEX_MODAL_STATE_KEY_PREFIX = "webex:modal:view:";
 const WEBEX_MODAL_STATE_TTL_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Mapping from normalized emoji names to Webex reaction shortcodes.
- * Webex supports a limited set of reactions.
- * @see https://developer.webex.com/docs/api/v1/message-reactions
- */
-const EMOJI_TO_WEBEX_REACTION: Record<string, string> = {
-  // Direct mappings
-  thumbs_up: "thumbsup",
-  thumbsup: "thumbsup",
-  "+1": "thumbsup",
-  thumbs_down: "thumbsdown",
-  thumbsdown: "thumbsdown",
-  "-1": "thumbsdown",
-  heart: "heart",
-  clap: "clap",
-  celebrate: "celebrate",
-  party: "celebrate",
-  tada: "celebrate",
-  laugh: "haha",
-  haha: "haha",
-  joy: "haha",
-  surprised: "surprised",
-  open_mouth: "surprised",
-  thinking: "thinking",
-  thinking_face: "thinking",
-  sad: "sad",
-  cry: "sad",
-  sob: "sad",
-  angry: "angry",
-  // Common aliases
-  like: "thumbsup",
-  love: "heart",
-  applause: "clap",
-  congratulations: "celebrate",
-};
 
 interface WebexRequestInit extends Omit<RequestInit, "body"> {
   body?: unknown;
@@ -833,79 +795,24 @@ export class WebexAdapter implements Adapter<WebexThreadId, WebexMessage> {
 
   async addReaction(
     _threadId: string,
-    messageId: string,
-    emoji: EmojiValue | string
+    _messageId: string,
+    _emoji: EmojiValue | string
   ): Promise<void> {
-    const reaction = this.resolveWebexReaction(emoji);
-    await this.webexRequest<WebexReaction>(
-      `/messages/${encodeURIComponent(messageId)}/reactions`,
-      {
-        method: "POST",
-        body: { reaction },
-      }
+    throw new NotImplementedError(
+      "webex",
+      "Webex bot tokens currently do not support message reactions in this adapter."
     );
   }
 
   async removeReaction(
     _threadId: string,
-    messageId: string,
-    emoji: EmojiValue | string
+    _messageId: string,
+    _emoji: EmojiValue | string
   ): Promise<void> {
-    const reaction = this.resolveWebexReaction(emoji);
-
-    // Webex requires the reactionId to delete, so we need to list reactions first
-    const response = await this.webexRequest<WebexListReactionsResponse>(
-      `/messages/${encodeURIComponent(messageId)}/reactions`,
-      { method: "GET" }
+    throw new NotImplementedError(
+      "webex",
+      "Webex bot tokens currently do not support message reactions in this adapter."
     );
-
-    // Find our bot's reaction with the matching emoji
-    const myReaction = response.items?.find(
-      (r) => r.personId === this._botUserId && r.reaction === reaction
-    );
-
-    if (myReaction) {
-      await this.webexRequest<void>(
-        `/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(myReaction.id)}`,
-        { method: "DELETE" }
-      );
-    }
-  }
-
-  private resolveWebexReaction(emoji: EmojiValue | string): string {
-    const emojiName =
-      typeof emoji === "string"
-        ? emoji.replace(/^:|:$/g, "").toLowerCase()
-        : emoji.name.toLowerCase();
-
-    // Check our mapping first
-    const mapped = EMOJI_TO_WEBEX_REACTION[emojiName];
-    if (mapped) {
-      return mapped;
-    }
-
-    // If it's already a valid Webex reaction shortcode, use it directly
-    const validWebexReactions = [
-      "thumbsup",
-      "thumbsdown",
-      "heart",
-      "celebrate",
-      "clap",
-      "haha",
-      "surprised",
-      "thinking",
-      "sad",
-      "angry",
-    ];
-    if (validWebexReactions.includes(emojiName)) {
-      return emojiName;
-    }
-
-    // Default to thumbsup for unknown emoji
-    this.logger.debug("Unknown emoji for Webex reaction, defaulting to thumbsup", {
-      emoji: emojiName,
-    });
-    return "thumbsup";
   }
 
   async startTyping(_threadId: string, _status?: string): Promise<void> {

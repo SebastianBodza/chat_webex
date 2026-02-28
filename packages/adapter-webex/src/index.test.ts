@@ -784,16 +784,8 @@ describe("api operations", () => {
     });
   });
 
-  it("adds a reaction to a message", async () => {
+  it("throws NotImplementedError when adding reactions", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        id: "reaction-1",
-        messageId: "msg-1",
-        personId: "bot",
-        reaction: "thumbsup",
-      })
-    );
 
     const adapter = createWebexAdapter({
       botToken: "token",
@@ -806,28 +798,18 @@ describe("api operations", () => {
       rootMessageId: "root-1",
     });
 
-    await adapter.addReaction(threadId, "msg-1", "thumbs_up");
+    await expect(
+      adapter.addReaction(threadId, "msg-1", "thumbs_up")
+    ).rejects.toMatchObject({
+      name: "NotImplementedError",
+      code: "NOT_IMPLEMENTED",
+    });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toContain("/messages/msg-1/reactions");
-    expect((init as RequestInit).method).toBe("POST");
-    const body = JSON.parse((init as RequestInit).body as string) as { reaction: string };
-    expect(body.reaction).toBe("thumbsup");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("maps emoji names to Webex reaction shortcodes", async () => {
+  it("throws NotImplementedError when removing reactions", async () => {
     const fetchMock = vi.mocked(fetch);
-    fetchMock.mockImplementation(() =>
-      Promise.resolve(
-        jsonResponse({
-          id: "reaction-1",
-          messageId: "msg-1",
-          personId: "bot",
-          reaction: "heart",
-        })
-      )
-    );
 
     const adapter = createWebexAdapter({
       botToken: "token",
@@ -840,79 +822,13 @@ describe("api operations", () => {
       rootMessageId: "root-1",
     });
 
-    // Test various emoji name formats
-    await adapter.addReaction(threadId, "msg-1", "heart");
-    await adapter.addReaction(threadId, "msg-1", ":thumbsup:");
-    await adapter.addReaction(threadId, "msg-1", "party");
-
-    const calls = fetchMock.mock.calls;
-    expect(JSON.parse((calls[0][1] as RequestInit).body as string)).toEqual({ reaction: "heart" });
-    expect(JSON.parse((calls[1][1] as RequestInit).body as string)).toEqual({ reaction: "thumbsup" });
-    expect(JSON.parse((calls[2][1] as RequestInit).body as string)).toEqual({ reaction: "celebrate" });
-  });
-
-  it("removes a reaction from a message", async () => {
-    const fetchMock = vi.mocked(fetch);
-    // First call: list reactions
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        items: [
-          { id: "reaction-1", personId: "bot", reaction: "thumbsup" },
-          { id: "reaction-2", personId: "other-user", reaction: "thumbsup" },
-        ],
-      })
-    );
-    // Second call: delete reaction
-    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
-
-    const adapter = createWebexAdapter({
-      botToken: "token",
-      botUserId: "bot",
-      logger: mockLogger,
+    await expect(
+      adapter.removeReaction(threadId, "msg-1", "thumbs_up")
+    ).rejects.toMatchObject({
+      name: "NotImplementedError",
+      code: "NOT_IMPLEMENTED",
     });
 
-    const threadId = adapter.encodeThreadId({
-      roomId: "room-1",
-      rootMessageId: "root-1",
-    });
-
-    await adapter.removeReaction(threadId, "msg-1", "thumbs_up");
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    // Verify list call
-    const [listUrl] = fetchMock.mock.calls[0];
-    expect(String(listUrl)).toContain("/messages/msg-1/reactions");
-    // Verify delete call - should delete only the bot's reaction
-    const [deleteUrl, deleteInit] = fetchMock.mock.calls[1];
-    expect(String(deleteUrl)).toContain("/reactions/reaction-1");
-    expect((deleteInit as RequestInit).method).toBe("DELETE");
-  });
-
-  it("does not delete when bot has no matching reaction", async () => {
-    const fetchMock = vi.mocked(fetch);
-    // Return reactions from other users only
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        items: [
-          { id: "reaction-2", personId: "other-user", reaction: "thumbsup" },
-        ],
-      })
-    );
-
-    const adapter = createWebexAdapter({
-      botToken: "token",
-      botUserId: "bot",
-      logger: mockLogger,
-    });
-
-    const threadId = adapter.encodeThreadId({
-      roomId: "room-1",
-      rootMessageId: "root-1",
-    });
-
-    await adapter.removeReaction(threadId, "msg-1", "thumbs_up");
-
-    // Should only call list, not delete
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
