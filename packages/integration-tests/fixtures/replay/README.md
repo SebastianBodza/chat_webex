@@ -235,6 +235,7 @@ Notes:
 - Webex message webhooks contain envelope metadata only; fetch full message via `GET /messages/{id}`.
 - Card submit actions arrive through `attachmentActions`; fetch details via `GET /attachment/actions/{id}`.
 - Signature validation uses `x-spark-signature` with your webhook secret.
+- Replay fixtures for Webex must include recorded API snapshots from the same session (messages, attachment actions, people, and rooms), otherwise tests cannot reproduce real message/action payloads.
 
 ## Troubleshooting
 

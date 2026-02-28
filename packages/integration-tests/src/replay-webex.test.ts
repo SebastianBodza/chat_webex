@@ -8,6 +8,7 @@ import {
   createMockWebexApi,
   createWebexWebhookRequest,
   seedRoomMessages,
+  seedWebexReplayFixtureApi,
   setupWebexFetchMock,
   WEBEX_BOT_TOKEN,
   WEBEX_WEBHOOK_SECRET,
@@ -23,10 +24,16 @@ const mockLogger: Logger = {
 };
 
 type CapturedMessages = {
-  followUpMessage: Message | null;
-  followUpThread: Thread | null;
   mentionMessage: Message | null;
   mentionThread: Thread | null;
+};
+
+type CapturedAction = {
+  actionId: string | null;
+  messageId: string | null;
+  thread: Thread | null;
+  userId: string | null;
+  value: unknown;
 };
 
 function expectMentionCaptured(
@@ -47,20 +54,19 @@ function expectMentionCaptured(
   expect(captured.mentionThread?.id).toContain(`${options.adapterName}:`);
 }
 
-function expectFollowUpCaptured(
-  captured: CapturedMessages,
+function expectActionCaptured(
+  captured: CapturedAction,
   options: {
     adapterName: string;
-    text: string;
+    actionId: string;
+    userId: string;
   }
 ): void {
-  expect(captured.followUpMessage).not.toBeNull();
-  expect(captured.followUpThread).not.toBeNull();
-  expect(captured.followUpMessage?.text).toBe(options.text);
-  expect(captured.followUpMessage?.author.isBot).toBe(false);
-  expect(captured.followUpMessage?.author.isMe).toBe(false);
-  expect(captured.followUpThread?.adapter.name).toBe(options.adapterName);
-  expect(captured.followUpThread?.id).toContain(`${options.adapterName}:`);
+  expect(captured.thread).not.toBeNull();
+  expect(captured.actionId).toBe(options.actionId);
+  expect(captured.userId).toBe(options.userId);
+  expect(captured.thread?.adapter.name).toBe(options.adapterName);
+  expect(captured.thread?.id).toContain(`${options.adapterName}:`);
 }
 
 describe("Webex Replay Tests", () => {
@@ -68,16 +74,26 @@ describe("Webex Replay Tests", () => {
   let mockApi: MockWebexApi;
   let tracker: ReturnType<typeof createWaitUntilTracker>;
   let captured: CapturedMessages;
+  let capturedAction: CapturedAction;
 
   const fixtureMention = webexFixtures.mention;
-  const fixtureFollowUp = webexFixtures.followUp;
+  const fixtureAction = webexFixtures.action;
+  const mentionMessageFromApi = webexFixtures.api.messages.find(
+    (message) => message.id === fixtureMention.data.id
+  );
+  const actionFromApi = webexFixtures.api.attachmentActions.find(
+    (action) => action.id === fixtureAction.data.id
+  );
+  const sourceActionMessageFromApi = webexFixtures.api.messages.find(
+    (message) => message.id === fixtureAction.data.messageId
+  );
+  if (!mentionMessageFromApi || !actionFromApi || !sourceActionMessageFromApi) {
+    throw new Error("Invalid Webex replay fixture: missing required recorded API data");
+  }
+
   const roomId = fixtureMention.data.roomId;
   const mentionMessageId = fixtureMention.data.id;
-  const followUpMessageId = fixtureFollowUp.data.id;
   const userId = fixtureMention.data.personId;
-  const userEmail = fixtureMention.data.personEmail;
-  const mentionText = "DummytestbotForChatSDK Mention in room ";
-  const followUpText = "hi ";
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -87,34 +103,16 @@ describe("Webex Replay Tests", () => {
     captured = {
       mentionMessage: null,
       mentionThread: null,
-      followUpMessage: null,
-      followUpThread: null,
+    };
+    capturedAction = {
+      actionId: null,
+      messageId: null,
+      thread: null,
+      userId: null,
+      value: undefined,
     };
 
-    seedRoomMessages(mockApi, roomId, [
-      {
-        id: mentionMessageId,
-        roomId,
-        personId: userId,
-        personEmail: userEmail,
-        personDisplayName: "Test User",
-        personType: "person",
-        roomType: "group",
-        text: mentionText,
-        mentionedPeople: [webexFixtures.botUserId],
-      },
-      {
-        id: followUpMessageId,
-        roomId,
-        parentId: mentionMessageId,
-        personId: userId,
-        personEmail: userEmail,
-        personDisplayName: "Test User",
-        personType: "person",
-        roomType: "group",
-        text: followUpText,
-      },
-    ]);
+    seedWebexReplayFixtureApi(mockApi, webexFixtures.api);
 
     const webexAdapter = createWebexAdapter({
       botToken: WEBEX_BOT_TOKEN,
@@ -138,11 +136,13 @@ describe("Webex Replay Tests", () => {
       await thread.post("Thanks for mentioning me!");
     });
 
-    chat.onSubscribedMessage(async (thread, message) => {
-      captured.followUpThread = thread;
-      captured.followUpMessage = message;
-      const response = await thread.post("Processing...");
-      await response.edit("Thanks for your message");
+    chat.onAction("hello", async (event) => {
+      capturedAction.actionId = event.actionId;
+      capturedAction.messageId = event.messageId;
+      capturedAction.thread = event.thread;
+      capturedAction.userId = event.user.userId;
+      capturedAction.value = event.value;
+      await event.thread.post("Action handled from replay");
     });
   });
 
@@ -165,10 +165,10 @@ describe("Webex Replay Tests", () => {
     expectMentionCaptured(captured, {
       adapterName: "webex",
       authorUserId: userId,
-      textContains: "Mention in room",
+      textContains: mentionMessageFromApi.text,
     });
     expect(captured.mentionMessage?.author).toMatchObject({
-      fullName: "Test User",
+      fullName: mentionMessageFromApi.personEmail,
       isBot: false,
       isMe: false,
     });
@@ -181,28 +181,22 @@ describe("Webex Replay Tests", () => {
     );
   });
 
-  it("replays follow-up in subscribed thread", async () => {
-    await sendWebhook(webexFixtures.mention);
-    mockApi.clearMocks();
+  it("replays attachment action with recorded webhook payload", async () => {
+    await sendWebhook(webexFixtures.action);
 
-    await sendWebhook(webexFixtures.followUp);
-
-    expectFollowUpCaptured(captured, {
+    expectActionCaptured(capturedAction, {
       adapterName: "webex",
-      text: followUpText,
+      actionId: actionFromApi.inputs.actionId,
+      userId: actionFromApi.personId,
     });
     expect(mockApi.createdMessageBodies).toContainEqual(
       expect.objectContaining({
         roomId,
-        parentId: mentionMessageId,
-        markdown: "Processing...",
+        parentId: sourceActionMessageFromApi.parentId ?? sourceActionMessageFromApi.id,
+        markdown: "Action handled from replay",
       })
     );
-    expect(mockApi.updatedMessageBodies).toContainEqual(
-      expect.objectContaining({
-        markdown: "Thanks for your message",
-      })
-    );
+    expect(capturedAction.messageId).toBe(actionFromApi.messageId);
   });
 
   it("skips webhook messages sent by the bot itself", async () => {
@@ -228,7 +222,6 @@ describe("Webex Replay Tests", () => {
     });
 
     expect(captured.mentionMessage).toBeNull();
-    expect(captured.followUpMessage).toBeNull();
     expect(mockApi.createdMessageBodies).toHaveLength(0);
   });
 });

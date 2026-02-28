@@ -2,25 +2,107 @@
   "botName": "DummytestbotForChatSDK",
   "botUserId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8zY2RkNDA1OS05MjU4LTQ3N2QtYjQ5NC1jMTMzYWMyY2ZhZDU",
   "mention": {
-    "id": "webhook-93d5ed60-143c-11f1-8c3c-17f8651c463c",
+    "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1dFQkhPT0svMjU0NWI5NmUtZTIyNy00YmJmLWIyZWEtNDhmZjcxMWY5ZjIz",
+    "name": "chat-sdk-webex-messages-created",
+    "targetUrl": "https://redacted.example.invalid/api/webhooks/webex",
     "resource": "messages",
     "event": "created",
+    "orgId": "Y2lzY29zcGFyazovL3VzL09SR0FOSVpBVElPTi83MWI2YjM0Yy1hYmZmLTQ0MDctYWM1MC01ZTYyMzIzYWVkODA",
+    "createdBy": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8zY2RkNDA1OS05MjU4LTQ3N2QtYjQ5NC1jMTMzYWMyY2ZhZDU",
+    "appId": "Y2lzY29zcGFyazovL3VzL0FQUExJQ0FUSU9OL0MzMmM4MDc3NDBjNmU3ZGYxMWRhZjE2ZjIyOGRmNjI4YmJjYTQ5YmE1MmZlY2JiMmM3ZDUxNWNiNGEwY2M5MWFh",
+    "ownedBy": "creator",
+    "status": "active",
+    "created": "2026-02-25T19:19:04.231Z",
     "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
     "data": {
-      "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvOTNkNWVkNjAtMTQzYy0xMWYxLThjM2MtMTdmODY1MWM0NjNj",
-      "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vODZhMWRhYTAtMTFkMC0xMWYxLWJiM2MtMjc4M2NhYTZlZjQy",
-      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU"
+      "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvNzZmZDk5ZjAtMTQ0MC0xMWYxLTk2Y2YtMTM5MjFjNTUwMDgz",
+      "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vMjhhOTBjNzAtMTI3Zi0xMWYxLTgxMWEtZWY5MjlkNWIyMjI0",
+      "roomType": "direct",
+      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
+      "personEmail": "redacted@example.invalid",
+      "created": "2026-02-28T00:57:33.199Z"
     }
   },
-  "followUp": {
-    "id": "webhook-97833df0-143c-11f1-b739-736f026def65",
-    "resource": "messages",
+  "action": {
+    "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1dFQkhPT0svYWUwOThhNjQtNGJjNy00Y2FhLWJiOTQtMDBjMWZmODE3ZTUy",
+    "name": "chat-sdk-webex-attachment-actions-created",
+    "targetUrl": "https://redacted.example.invalid/api/webhooks/webex",
+    "resource": "attachmentActions",
     "event": "created",
+    "orgId": "Y2lzY29zcGFyazovL3VzL09SR0FOSVpBVElPTi83MWI2YjM0Yy1hYmZmLTQ0MDctYWM1MC01ZTYyMzIzYWVkODA",
+    "createdBy": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8zY2RkNDA1OS05MjU4LTQ3N2QtYjQ5NC1jMTMzYWMyY2ZhZDU",
+    "appId": "Y2lzY29zcGFyazovL3VzL0FQUExJQ0FUSU9OL0MzMmM4MDc3NDBjNmU3ZGYxMWRhZjE2ZjIyOGRmNjI4YmJjYTQ5YmE1MmZlY2JiMmM3ZDUxNWNiNGEwY2M5MWFh",
+    "ownedBy": "creator",
+    "status": "active",
+    "created": "2026-02-25T19:19:04.436Z",
     "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
     "data": {
-      "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvOTc4MzNkZjAtMTQzYy0xMWYxLWI3MzktNzM2ZjAyNmRlZjY1",
-      "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vODZhMWRhYTAtMTFkMC0xMWYxLWJiM2MtMjc4M2NhYTZlZjQy",
-      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU"
+      "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL0FUVEFDSE1FTlRfQUNUSU9OLzc5ZWZiMGQwLTE0NDAtMTFmMS05NmNmLTEzOTIxYzU1MDA4Mw",
+      "type": "submit",
+      "messageId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvNzdmZjJiNzAtMTQ0MC0xMWYxLWJiOWMtN2ZlNGUzY2JmMTdl",
+      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
+      "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vMjhhOTBjNzAtMTI3Zi0xMWYxLTgxMWEtZWY5MjlkNWIyMjI0",
+      "created": "2026-02-28T00:57:38.141Z"
     }
+  },
+  "api": {
+    "messages": [
+      {
+        "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvNzZmZDk5ZjAtMTQ0MC0xMWYxLTk2Y2YtMTM5MjFjNTUwMDgz",
+        "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vMjhhOTBjNzAtMTI3Zi0xMWYxLTgxMWEtZWY5MjlkNWIyMjI0",
+        "roomType": "direct",
+        "text": "test",
+        "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
+        "personEmail": "redacted@example.invalid",
+        "created": "2026-02-28T00:57:33.199Z"
+      },
+      {
+        "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvNzdmZjJiNzAtMTQ0MC0xMWYxLWJiOWMtN2ZlNGUzY2JmMTdl",
+        "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vMjhhOTBjNzAtMTI3Zi0xMWYxLTgxMWEtZWY5MjlkNWIyMjI0",
+        "roomType": "direct",
+        "text": "👋 Welcome! Connected via webex I'm now listening to this thread. Try these actions: ✨ Mention me with \"AI\" to enable AI assistant mode DM Support: Yes Platform: webex",
+        "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8zY2RkNDA1OS05MjU4LTQ3N2QtYjQ5NC1jMTMzYWMyY2ZhZDU",
+        "personEmail": "DummytestbotForChatSDK@webex.bot",
+        "created": "2026-02-28T00:57:34.887Z",
+        "parentId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvNzZmZDk5ZjAtMTQ0MC0xMWYxLTk2Y2YtMTM5MjFjNTUwMDgz"
+      }
+    ],
+    "attachmentActions": [
+      {
+        "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL0FUVEFDSE1FTlRfQUNUSU9OLzc5ZWZiMGQwLTE0NDAtMTFmMS05NmNmLTEzOTIxYzU1MDA4Mw",
+        "type": "submit",
+        "messageId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvNzdmZjJiNzAtMTQ0MC0xMWYxLWJiOWMtN2ZlNGUzY2JmMTdl",
+        "inputs": {
+          "actionId": "hello"
+        },
+        "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
+        "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vMjhhOTBjNzAtMTI3Zi0xMWYxLTgxMWEtZWY5MjlkNWIyMjI0",
+        "created": "2026-02-28T00:57:38.141Z"
+      }
+    ],
+    "people": [
+      {
+        "id": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
+        "emails": [
+          "redacted@example.invalid"
+        ],
+        "displayName": "Redacted User",
+        "nickName": "Redacted",
+        "firstName": "Redacted",
+        "lastName": "User",
+        "userName": "redacted@example.invalid",
+        "type": "person"
+      }
+    ],
+    "rooms": [
+      {
+        "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vMjhhOTBjNzAtMTI3Zi0xMWYxLTgxMWEtZWY5MjlkNWIyMjI0",
+        "title": "Redacted User",
+        "type": "direct",
+        "isLocked": false,
+        "isPublic": false,
+        "isReadOnly": false
+      }
+    ]
   }
 }

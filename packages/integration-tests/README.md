@@ -11,6 +11,8 @@ Integration tests for the Chat SDK that verify real-world webhook payloads are h
 
 Replay tests use recorded webhook payloads from production to verify the SDK handles real interactions correctly.
 
+Webex limitation: Webex webhook payloads are envelope-only. The replay fixture must also persist the recorded Webex API responses (message/action/person/room snapshots) captured in the same Redis-backed recording session.
+
 **See [fixtures/replay/README.md](./fixtures/replay/README.md) for:**
 - How to record new fixtures
 - Fixture format documentation

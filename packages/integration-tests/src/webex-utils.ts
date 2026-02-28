@@ -25,6 +25,13 @@ export interface MockWebexApi {
   clearMocks: () => void;
 }
 
+export interface WebexReplayFixtureApi {
+  attachmentActions?: WebexAttachmentAction[];
+  messages?: WebexMessage[];
+  people?: WebexPerson[];
+  rooms?: WebexRoom[];
+}
+
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -148,6 +155,35 @@ export function seedRoomMessages(
     ids.push(message.id);
   }
   mockApi.roomMessageOrder.set(roomId, ids);
+}
+
+export function seedWebexReplayFixtureApi(
+  mockApi: MockWebexApi,
+  fixtureApi: WebexReplayFixtureApi
+): void {
+  for (const room of fixtureApi.rooms ?? []) {
+    mockApi.roomsById.set(room.id, room);
+  }
+
+  for (const person of fixtureApi.people ?? []) {
+    mockApi.peopleById.set(person.id, person);
+  }
+
+  for (const action of fixtureApi.attachmentActions ?? []) {
+    mockApi.actionsById.set(action.id, action);
+  }
+
+  const roomToMessages = new Map<string, WebexMessage[]>();
+  for (const message of fixtureApi.messages ?? []) {
+    if (!roomToMessages.has(message.roomId)) {
+      roomToMessages.set(message.roomId, []);
+    }
+    roomToMessages.get(message.roomId)?.push(message);
+  }
+
+  for (const [roomId, messages] of roomToMessages.entries()) {
+    seedRoomMessages(mockApi, roomId, messages);
+  }
 }
 
 export function setupWebexFetchMock(mockApi: MockWebexApi): void {
