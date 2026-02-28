@@ -1,30 +1,26 @@
 {
-  "botName": "Chat SDK Webex Bot",
-  "botUserId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9ib3QtdXNlci0xMjM",
+  "botName": "DummytestbotForChatSDK",
+  "botUserId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS8zY2RkNDA1OS05MjU4LTQ3N2QtYjQ5NC1jMTMzYWMyY2ZhZDU",
   "mention": {
-    "id": "webhook-event-mention",
+    "id": "webhook-93d5ed60-143c-11f1-8c3c-17f8651c463c",
     "resource": "messages",
     "event": "created",
-    "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
+    "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
     "data": {
-      "id": "Y2lzY29zcGFyazovL3VzL01FU1NBR0UvbWVudGlvbi0x",
-      "roomId": "Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbS0xMjM",
-      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
-      "personEmail": "user@example.com",
-      "created": "2026-02-28T10:00:00.000Z"
+      "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvOTNkNWVkNjAtMTQzYy0xMWYxLThjM2MtMTdmODY1MWM0NjNj",
+      "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vODZhMWRhYTAtMTFkMC0xMWYxLWJiM2MtMjc4M2NhYTZlZjQy",
+      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU"
     }
   },
   "followUp": {
-    "id": "webhook-event-followup",
+    "id": "webhook-97833df0-143c-11f1-b739-736f026def65",
     "resource": "messages",
     "event": "created",
-    "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
+    "actorId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU",
     "data": {
-      "id": "Y2lzY29zcGFyazovL3VzL01FU1NBR0UvZm9sbG93dXAtMQ",
-      "roomId": "Y2lzY29zcGFyazovL3VzL1JPT00vcm9vbS0xMjM",
-      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS91c2VyLTEyMw",
-      "personEmail": "user@example.com",
-      "created": "2026-02-28T10:01:00.000Z"
+      "id": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL01FU1NBR0UvOTc4MzNkZjAtMTQzYy0xMWYxLWI3MzktNzM2ZjAyNmRlZjY1",
+      "roomId": "Y2lzY29zcGFyazovL3VybjpURUFNOnVzLXdlc3QtMl9yL1JPT00vODZhMWRhYTAtMTFkMC0xMWYxLWJiM2MtMjc4M2NhYTZlZjQy",
+      "personId": "Y2lzY29zcGFyazovL3VzL1BFT1BMRS9lMjg5YTQ3MC05ODE4LTQ4MmItYjI1ZC00MTYyYWE4OWQ4NWU"
     }
   }
 }
