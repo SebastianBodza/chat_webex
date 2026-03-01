@@ -1,4 +1,8 @@
-# Chat SDK
+# (Deprecated) use the community adapter version:
+https://github.com/SebastianBodza/chat-adapter-webex
+
+
+## Chat SDK
 
 [![npm version](https://img.shields.io/npm/v/chat)](https://www.npmjs.com/package/chat)
 [![npm downloads](https://img.shields.io/npm/dm/chat)](https://www.npmjs.com/package/chat)
